@@ -1,132 +1,144 @@
-# 🛠️ Backend de Inspecciones Técnicas - Goodyear
 
-Este backend está desarrollado en **Django 5** con conexión a base de datos **MySQL**, autenticación segura mediante **LDAP corporativo**, y estructura modular para manejo de inspecciones técnicas.
+# 🛠️ Backend de Inspecciones Técnicas - Producción
+
+Este es el backend en Django para el sistema de inspecciones técnicas de Goodyear Chile. El sistema gestiona zonas, equipos, inspecciones técnicas y autenticación vía LDAP.
 
 ---
 
 ## 🚀 Tecnologías utilizadas
 
-- [Django 5.x](https://www.djangoproject.com/)
-- [MySQL](https://www.mysql.com/)
-- [LDAP3](https://ldap3.readthedocs.io/) (autenticación corporativa)
-- [python-decouple](https://github.com/henriquebastos/python-decouple) (gestión segura de variables)
-- [Django REST](https://www.django-rest-framework.org/) *(opcional para futuro uso)*
+- Python 3.13.x
+- Django 5.2
+- MySQL (conector: PyMySQL)
+- Waitress (servidor WSGI en Windows)
+- python-decouple (manejo de variables de entorno)
+- django-cors-headers (manejo de CORS)
+- LDAP3 (autenticación corporativa)
 
 ---
 
-## 🧾 Funcionalidades
+## 📁 Estructura del proyecto
 
-- Registro de inspecciones técnicas por fecha, hora y responsable.
-- Asociaciones entre **División → Área → Zona → Equipo**.
-- Control de categoría, ubicación física y responsable del equipo (owner).
-- Preguntas técnicas dinámicas por categoría.
-- Panel de dashboard con JSON listo para consumir en frontend.
-- Autenticación con **servidor LDAP de Goodyear**.
-- Protección de endpoints (`/api/guardar/`) mediante login corporativo.
-
----
-
-## 📂 Estructura principal
-
-```bash
-mi-proyecto-backend/
-│
-├── .env                    # Variables de entorno seguras
-├── manage.py              # Arranque de Django
-├── mi_formulario/         # Configuración global del proyecto
-│   └── settings.py        # Incluye conexión MySQL y LDAP desde .env
-│
-├── inspeccion/            # App principal del backend
-│   ├── models.py          # Tablas: División, Área, Zona, Equipo, etc.
-│   ├── views.py           # Endpoints de API
-│   ├── urls.py            # Rutas del backend
-│   ├── ldap_auth.py       # Lógica de autenticación corporativa
-│   └── ...
+```
+mi-backend/
+├── inspeccion/            # Aplicación principal
+├── mi_formulario/         # Configuración Django (settings, wsgi)
+├── static/                # Archivos estáticos recolectados
+├── venv/                  # Entorno virtual (ignorado en Git)
+├── .env                   # Variables de entorno (no subir a Git)
+├── .gitignore
+├── requirements.txt
+├── run_waitress.py        # Script para ejecutar con Waitress
+└── README.md
 ```
 
 ---
 
-## ⚙️ Configuración e instalación local
+## ⚙️ Configuración inicial
+
+### 1. Clona el repositorio
 
 ```bash
-# Clona el repositorio
-git clone https://github.com/TU_USUARIO/TU_REPO.git
-cd mi-proyecto-backend
+git clone https://github.com/usuario/backend-produccion.git
+cd backend-produccion
+```
 
-# Crea un entorno virtual
+### 2. Crea y activa el entorno virtual
+
+```bash
 python -m venv venv
-venv\Scripts\activate  # En Windows
-
-# Instala dependencias
-pip install -r requirements.txt
-
-# Configura variables en .env
+venv\Scripts\activate
 ```
 
----
+### 3. Instala las dependencias
 
-## 🔐 Variables de entorno (.env)
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Crea el archivo `.env`
+
+Copia y completa el archivo según tu entorno. Ejemplo:
 
 ```env
-SECRET_KEY=tu_clave_django
-DEBUG=True
+SECRET_KEY=clave-secreta-django
+DEBUG=False
+ALLOWED_HOSTS=localhost,127.0.0.1,10.107.202.51
+CSRF_TRUSTED_ORIGINS=http://localhost:3010,http://10.107.202.51:3010
 
-# Base de datos MySQL
+# Base de datos
 MYSQL_DATABASE=inspecciones
-MYSQL_USER=root
-MYSQL_PASSWORD=1234
-MYSQL_HOST=localhost
+MYSQL_USER=usuario
+MYSQL_PASSWORD=clave
+MYSQL_HOST=10.107.194.111
 MYSQL_PORT=3306
 
-# LDAP corporativo
-LDAP_SERVER=ldap://CLSDCLA2.la.ad.goodyear.com:3268
-LDAP_DOMAIN=la.ad.goodyear.com
+# LDAP
+LDAP_SERVER=ldap://servidor.ldap:3268
+LDAP_DOMAIN=miempresa.local
+
+# CORS
+CORS_ALLOW_ALL_ORIGINS=False
+CORS_ALLOWED_ORIGINS=http://localhost:3010,http://10.107.202.51:3010
 ```
 
 ---
 
-## 📡 Endpoints disponibles
+## 🧪 Migraciones y carga inicial (solo si parte desde cero)
 
-| Método | Ruta                               | Descripción                         |
-|--------|------------------------------------|-------------------------------------|
-| POST   | `/api/login-ldap/`                 | Login corporativo (LDAP)           |
-| POST   | `/api/logout/`                     | Cerrar sesión                      |
-| POST   | `/api/guardar/`                    | Guardar inspección técnica 🔒       |
-| GET    | `/api/divisiones/`                 | Listar divisiones                  |
-| GET    | `/api/areas/`                      | Listar áreas                       |
-| GET    | `/api/zonas/`                      | Listar zonas                       |
-| GET    | `/api/equipos/`                    | Listar equipos completos           |
-| GET    | `/api/equipo/<id>/`                | Obtener detalles de un equipo      |
-| GET    | `/api/categorias/`                 | Listar categorías de equipos       |
-| GET    | `/api/preguntas/<categoria>/`      | Preguntas técnicas por categoría   |
-| GET    | `/api/dashboard/inspecciones/`     | Datos para el dashboard técnico    |
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
 
 ---
 
-## 🔐 Seguridad
+## ▶️ Ejecución en producción (Windows + Waitress)
 
-- Las credenciales de base de datos y LDAP **no están en el código**, sino en `.env`.
-- El endpoint de inspecciones está **protegido por autenticación LDAP y sesión de Django**.
-- El proyecto utiliza `@login_required` y `SessionMiddleware`.
+### Archivo: `run_waitress.py`
 
----
+```python
+from waitress import serve
+from mi_formulario.wsgi import application
 
-## 🤝 Colaboración
+serve(application, host='0.0.0.0', port=8080)
+```
 
-1. Forkea el repositorio
-2. Crea tu rama: `git checkout -b feature/mi-funcionalidad`
-3. Haz commit: `git commit -m "Agrega nueva funcionalidad"`
-4. Haz push: `git push origin feature/mi-funcionalidad`
-5. Abre un Pull Request
+### Para ejecutarlo:
 
----
-
-## 📌 Requisitos
-
-- Python 3.11 o superior
-- MySQL 8 o compatible
-- Acceso al servidor LDAP corporativo (Goodyear)
+```bash
+python run_waitress.py
+```
 
 ---
 
-¿Tienes dudas o sugerencias? ¡Contáctame o crea un issue en GitHub!
+## 🔐 Panel de administración
+
+- URL: [http://localhost:8080/admin](http://localhost:8080/admin)
+- Crear superusuario (si no existe):
+
+```bash
+python manage.py createsuperuser
+```
+
+---
+
+## 📦 Archivos importantes
+
+- `.env`: configuración del entorno (no se sube al repositorio)
+- `requirements.txt`: lista de dependencias
+- `.gitignore`: ignora `venv/`, `.env`, `__pycache__/`, entre otros
+
+---
+
+## 🧠 Notas adicionales
+
+- Asegúrate de que `CORS_ALLOWED_ORIGINS` coincida con el dominio/puerto del frontend.
+- En producción real, usar `DEBUG=False` y definir correctamente `ALLOWED_HOSTS`.
+- Este backend se comunica con un frontend hecho en Next.js (`:3010`) y requiere conexión con MySQL.
+
+---
+
+## 📄 Licencia
+
+Privado · Uso interno en Goodyear Chile · 2024–2025

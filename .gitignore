@@ -1,0 +1,14 @@
+# Entorno virtual
+venv/
+.env
+.env.*
+
+# Archivos de sistema
+__pycache__/
+*.pyc
+
+# Archivos generados
+*.log
+*.sqlite3
+static/
+*.db

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Inspección</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f3f3f3;
+            margin: 0;
+            padding: 0;
+        }
+        .formulario-container {
+            max-width: 700px;
+            margin: 40px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-top: 20px;
+            margin-bottom: 6px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        button {
+            margin-top: 30px;
+            padding: 12px 24px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #005ea2;
+        }
+    </style>
+</head>
+<body>
+    <div class="formulario-container">
+        <h1>Inspección Conveyor 01</h1>
+        <form id="formulario-inspeccion">
+            <label for="fecha">Fecha de inspección</label>
+            <input type="date" id="fecha" name="fecha" required>
+
+            <label for="turno">Turno</label>
+            <select id="turno" name="turno" required>
+                <option value="">Seleccione...</option>
+                <option value="1">1er Turno</option>
+                <option value="2">2do Turno</option>
+                <option value="3">3er Turno</option>
+            </select>
+
+            <label for="inspector">Nombre del inspector</label>
+            <input type="text" id="inspector" name="inspector" required>
+
+            <label for="estado_motor">Estado del motor</label>
+            <select id="estado_motor" name="estado_motor" required>
+                <option value="">Seleccione...</option>
+                <option value="bueno">Bueno</option>
+                <option value="regular">Regular</option>
+                <option value="malo">Malo</option>
+            </select>
+
+            <label for="observaciones">Observaciones generales</label>
+            <textarea id="observaciones" name="observaciones" rows="4"></textarea>
+
+            <button type="submit">Enviar Inspección</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('formulario-inspeccion');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                fecha: form.fecha.value,
+                turno: form.turno.value,
+                inspector: form.inspector.value,
+                estado_motor: form.estado_motor.value,
+                observaciones: form.observaciones.value
+            };
+
+            const response = await fetch('/api/guardar/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            alert(result.message);
+            form.reset();
+        });
+    </script>
+</body>
+</html>

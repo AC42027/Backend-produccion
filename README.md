@@ -135,10 +135,8 @@ python manage.py createsuperuser
 
 - Asegúrate de que `CORS_ALLOWED_ORIGINS` coincida con el dominio/puerto del frontend.
 - En producción real, usar `DEBUG=False` y definir correctamente `ALLOWED_HOSTS`.
-- Este backend se comunica con un frontend hecho en Next.js (`:3010`) y requiere conexión con MySQL.
+- Este backend se comunica con un frontend hecho en Next.js (`:8000`) y requiere conexión con MySQL.
 
 ---
-
-## 📄 Licencia
 
 Privado · Uso interno en Goodyear Chile · 2024–2025

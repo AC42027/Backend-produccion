@@ -79,6 +79,7 @@ CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bo
 
 if not CORS_ALLOW_ALL_ORIGINS:
     CORS_ALLOWED_ORIGINS = CsvParser()(config('CORS_ALLOWED_ORIGINS', default=''))
+    print("✔️ CORS_ALLOWED_ORIGINS:", CORS_ALLOWED_ORIGINS)
 
 
 LANGUAGE_CODE = 'en-us'

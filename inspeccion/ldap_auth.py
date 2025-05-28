@@ -3,8 +3,8 @@ from ldap3 import Server, Connection, ALL, NTLM
 from decouple import config
 
 def autenticar_usuario(username, password):
-    LDAP_SERVER = config('LDAP_SERVER')  # ej: ldap://CLSDCLA2.la.ad.goodyear.com:3268
-    LDAP_DOMAIN = config('LDAP_DOMAIN')  # ej: la.ad.goodyear.com
+    LDAP_SERVER = config('LDAP_SERVER')  
+    LDAP_DOMAIN = config('LDAP_DOMAIN')  
     USER_DN = f"{username}@{LDAP_DOMAIN}"
 
     try:

@@ -1,0 +1,38 @@
+/* Ajustes generales para el Panel de Administración */
+
+/* 1. Logo en la barra lateral (Sidebar) */
+.brand-link .brand-image {
+    max-height: 35px !important;
+    width: auto !important;
+    margin-top: -5px;
+}
+
+/* Ocultar el texto "Goodyear" en la barra lateral porque ya está el logo */
+.brand-text {
+    display: none !important;
+}
+
+/* 2. Pantalla de LOGIN */
+
+/* Contenedor del logo centrado */
+.login-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* OCULTAR el logo duplicado (logo-dark) que genera Jazzmin 3.0 */
+.login-logo .logo-dark {
+    display: none !important;
+}
+
+/* Estilo para el logo visible (logo-light) */
+.login-logo .logo-light,
+.login-box .login-logo img:not(.logo-dark) {
+    max-width: 160px !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
+}

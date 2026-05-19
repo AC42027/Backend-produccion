@@ -9,35 +9,54 @@ from .ldap_auth import autenticar_usuario
 
 from .models import (
     Division, Area, Zona, Equipo, Inspeccion, Categoria,
-    InspeccionTecnico, PreguntaTecnica, UbicacionFisica, Owner
+    InspeccionTecnico, PreguntaTecnica, UbicacionFisica, Owner,
+    AsignacionInspeccion
 )
+from .serializers import AsignacionInspeccionSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 
 import json
 from datetime import datetime
 
 @csrf_exempt
 def login_ldap(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
-        password = data.get('password')
+    # ✅ FIX CORS PREFLIGHT: Next.js siempre envía una petición 'OPTIONS' antes del POST
+    # para verificar permisos. Si le devolvemos error aquí, Next.js cancela todo y da "Acceso denegado".
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'}) 
 
-        auth_result = autenticar_usuario(username, password)
-        if auth_result.get('success'):
-            user, created = User.objects.get_or_create(username=username)
-            user.first_name = auth_result.get('first_name', '')
-            user.last_name = auth_result.get('last_name', '')
-            user.email = auth_result.get('email', '')
-            user.save()
-            login(request, user)
-            return JsonResponse({
-                'status': 'ok',
-                'message': 'Login exitoso',
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-            })
-        else:
-            return JsonResponse({'status': 'error', 'message': 'Credenciales inválidas'})
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            username = data.get('username')
+            password = data.get('password')
+
+            auth_result = autenticar_usuario(username, password)
+            
+            if auth_result.get('success'):
+                user, created = User.objects.get_or_create(username=username)
+                user.first_name = auth_result.get('first_name', '')
+                user.last_name = auth_result.get('last_name', '')
+                user.email = auth_result.get('email', '')
+                user.save()
+                login(request, user)
+                
+                return JsonResponse({
+                    'status': 'ok',
+                    'message': 'Login exitoso',
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                })
+            else:
+                return JsonResponse({'status': 'error', 'message': 'Credenciales inválidas'}, status=401)
+                
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Formato JSON inválido'}, status=400)
+
+    # Si alguien intenta entrar con GET (como desde el navegador), le respondemos en JSON (esto arregla el error de sintaxis en Next.js)
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido. Se requiere POST.'}, status=405)
 
 @csrf_exempt
 def logout_view(request):
@@ -46,39 +65,56 @@ def logout_view(request):
 
 @csrf_exempt
 def guardar_inspeccion_individual(request):
+    # ✅ FIX CORS PREFLIGHT también aquí por si acaso
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'})
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
+            
+            # ✅ CAPTURAR EL OWNER: Aquí recibimos el "ac17157" del frontend
+            owner_ldap = data.get('owner', '') 
+            
             division = Division.objects.get(id=data['division'])
             area = Area.objects.get(id=data['area'])
             zona = Zona.objects.get(id=data['zona'])
             equipo = Equipo.objects.get(id=data['equipo'])
-
-            hora_inicio = parse_time(data['horaInicio'])
-            hora_fin = parse_time(data['horaFin'])
-
+            
             inspeccion = Inspeccion.objects.create(
                 fecha=data['fecha'],
-                hora_inicio=hora_inicio,
-                hora_fin=hora_fin,
+                hora_inicio=parse_time(data['horaInicio']),
+                hora_fin=parse_time(data['horaFin']),
                 division=division,
                 area=area,
                 zona=zona,
                 equipo=equipo,
-                observaciones=data.get('observaciones', '')
+                observaciones=data.get('observaciones', ''),
+                
+                # ✅ GUARDAR EL OWNER: 
+                # OJO: Asumo que en tu models.py, a la tabla "Inspeccion" le agregaste 
+                # un campo llamado "owner" (como CharField). Si le pusiste otro nombre (ej: usuario), cámbialo aquí.
+                owner=owner_ldap
             )
 
-            for descripcion, estado in data.get('tecnicos', {}).items():
+            # ... el resto de tu código de InspeccionTecnico queda exactamente igual ...
+            tecnicos_data = data.get('tecnicos', {})
+            comentarios_data = data.get('observacionesTecnicas', {}) 
+            criticos_data = data.get('criticos', {})
+
+            for descripcion, estado in tecnicos_data.items():
                 InspeccionTecnico.objects.create(
                     inspeccion=inspeccion,
                     descripcion=descripcion,
-                    estado=estado
+                    estado=estado,
+                    comentario=comentarios_data.get(descripcion, ""), 
+                    es_critico=criticos_data.get(descripcion, False)
                 )
 
             return JsonResponse({'status': 'ok', 'message': 'Inspección guardada'})
+
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
 
 def parse_time(hora_str):
     formatos = ['%H:%M:%S', '%I:%M:%S %p']
@@ -148,11 +184,11 @@ def obtener_preguntas_por_categoria(request, categoria_nombre):
     return JsonResponse(data, safe=False)
 
 def inspecciones_dashboard(request):
-    inspecciones = Inspeccion.objects.select_related('division', 'area', 'zona', 'equipo__owner').all()
+    inspecciones = Inspeccion.objects.select_related('division', 'area', 'zona', 'equipo').all()
     data = []
 
     for ins in inspecciones:
-        tecnicos = InspeccionTecnico.objects.filter(inspeccion=ins).values('descripcion', 'estado')
+        tecnicos = InspeccionTecnico.objects.filter(inspeccion=ins).values('descripcion', 'estado', 'comentario', 'es_critico')
         data.append({
             'id': ins.id,
             'fecha': ins.fecha.strftime('%Y-%m-%d'),
@@ -162,9 +198,43 @@ def inspecciones_dashboard(request):
             'area': ins.area.nombre,
             'zona': ins.zona.nombre,
             'equipo': ins.equipo.nombre,
-            'owner': ins.equipo.owner.nombre if ins.equipo.owner else '',
+            'owner': ins.owner if hasattr(ins, 'owner') and ins.owner else '',
             'observaciones': ins.observaciones,
             'tecnicos': list(tecnicos),
         })
 
     return JsonResponse(data, safe=False)
+
+class AsignacionesView(APIView):
+    def get(self, request):
+        fecha_filtro = request.query_params.get('fecha', None)
+        if fecha_filtro:
+            asignaciones = AsignacionInspeccion.objects.filter(fecha=fecha_filtro)
+        else:
+            asignaciones = AsignacionInspeccion.objects.all()
+            
+        serializer = AsignacionInspeccionSerializer(asignaciones, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        fecha = request.data.get('fecha')
+        asignaciones_data = request.data.get('asignaciones', [])
+        
+        if not fecha:
+            return Response({"error": "Falta el campo 'fecha'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Eliminar previas de esa semana
+        AsignacionInspeccion.objects.filter(fecha=fecha).delete()
+
+        nuevas_asignaciones = []
+        for item in asignaciones_data:
+            nuevas_asignaciones.append(AsignacionInspeccion(
+                fecha=fecha,
+                asociado=item.get('asociado'),
+                equipo=item.get('equipo'),
+                zona=item.get('zona'),
+                asignado_por=request.data.get('asignado_por', 'Admin')
+            ))
+        
+        AsignacionInspeccion.objects.bulk_create(nuevas_asignaciones)
+        return Response({"status": "ok", "mensaje": f"Se guardaron {len(nuevas_asignaciones)} asignaciones"}, status=status.HTTP_201_CREATED)

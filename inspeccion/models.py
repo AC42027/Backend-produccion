@@ -82,12 +82,20 @@ class Inspeccion(models.Model):
     observaciones = models.TextField(blank=True)
     owner = models.CharField(max_length=50, blank=True, null=True) # << NUEVO
 
-    # NUEVOS CAMPOS SAP
+    # CAMPOS SAP - datos del equipo
     sap_equnr = models.CharField(max_length=50, blank=True, null=True, verbose_name="Código Equipo SAP")
     sap_equnr_desc = models.CharField(max_length=150, blank=True, null=True, verbose_name="Nombre Asociado en SAP")
     sap_tplnr = models.CharField(max_length=50, blank=True, null=True, verbose_name="Ubicación Técnica (TPLNR)")
     sap_puesto_trabajo = models.CharField(max_length=50, blank=True, null=True, verbose_name="Puesto de Trabajo SAP")
     comentario_hallazgo = models.TextField(blank=True, null=True, verbose_name="Comentario de SAP")
+
+    # CAMPOS SAP - resultado de la notificación NR creada
+    sap_nr_numero = models.CharField(max_length=20, blank=True, null=True, verbose_name="N° Notificación SAP (NR)")
+    sap_nr_status = models.CharField(
+        max_length=20, blank=True, null=True,
+        verbose_name="Estado sincronización SAP",
+        choices=[('creada', 'Creada en SAP'), ('error', 'Error SAP'), ('pendiente', 'Pendiente')]
+    )
 
     def __str__(self):
         return f"Inspección {self.id} - {self.fecha}"

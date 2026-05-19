@@ -98,15 +98,17 @@ class OwnerAdmin(admin.ModelAdmin):
 
 @admin.register(Inspeccion)
 class InspeccionAdmin(admin.ModelAdmin):
-    list_display = ('fecha', 'equipo', 'sap_equnr', 'sap_puesto_trabajo', 'owner')
-    list_filter = ("fecha", ("equipo", admin.RelatedOnlyFieldListFilter))
-    search_fields = ("equipo__nombre", "sap_equnr", "sap_puesto_trabajo")
+    list_display = ('fecha', 'equipo', 'sap_equnr', 'sap_puesto_trabajo', 'owner', 'sap_nr_numero', 'sap_nr_status')
+    list_filter  = ("fecha", ("equipo", admin.RelatedOnlyFieldListFilter), "sap_nr_status")
+    search_fields = ("equipo__nombre", "sap_equnr", "sap_puesto_trabajo", "sap_nr_numero")
+    readonly_fields = ('sap_nr_numero', 'sap_nr_status')
     fields = (
-        'fecha', 'hora_inicio', 'hora_fin', 
-        'division', 'area', 'zona', 'equipo', 
-        'sap_equnr', 'sap_equnr_desc', 'sap_tplnr', 'sap_puesto_trabajo', # Nuevos campos
-        'observaciones', 'comentario_hallazgo', # Comentario de SAP
-        'owner'
+        'fecha', 'hora_inicio', 'hora_fin',
+        'division', 'area', 'zona', 'equipo',
+        'sap_equnr', 'sap_equnr_desc', 'sap_tplnr', 'sap_puesto_trabajo',
+        'observaciones', 'comentario_hallazgo',
+        'owner',
+        'sap_nr_numero', 'sap_nr_status',   # campos de resultado SAP (solo lectura)
     )
 
 @admin.register(InspeccionTecnico)

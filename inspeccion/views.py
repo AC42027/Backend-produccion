@@ -13,6 +13,7 @@ from .models import (
     AsignacionInspeccion
 )
 from .serializers import AsignacionInspeccionSerializer
+from .sap_connector import crear_notificacion_sap
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -99,9 +100,8 @@ def guardar_inspeccion_individual(request):
                 owner=owner_ldap
             )
 
-            # ... el resto de tu código de InspeccionTecnico queda exactamente igual ...
             tecnicos_data = data.get('tecnicos', {})
-            comentarios_data = data.get('observacionesTecnicas', {}) 
+            comentarios_data = data.get('observacionesTecnicas', {})
             criticos_data = data.get('criticos', {})
 
             for descripcion, estado in tecnicos_data.items():
@@ -109,11 +109,23 @@ def guardar_inspeccion_individual(request):
                     inspeccion=inspeccion,
                     descripcion=descripcion,
                     estado=estado,
-                    comentario=comentarios_data.get(descripcion, ""), 
+                    comentario=comentarios_data.get(descripcion, ''),
                     es_critico=criticos_data.get(descripcion, False)
                 )
 
-            return JsonResponse({'status': 'ok', 'message': 'Inspección guardada'})
+            # --- Integración SAP PM: crear Notificación NR (IW21) ---
+            nr_result = crear_notificacion_sap(inspeccion)
+            inspeccion.sap_nr_numero = nr_result.get('nr_numero', '')
+            inspeccion.sap_nr_status = nr_result.get('status', 'error')
+            inspeccion.save(update_fields=['sap_nr_numero', 'sap_nr_status'])
+
+            return JsonResponse({
+                'status': 'ok',
+                'message': 'Inspección guardada',
+                'sap_nr': inspeccion.sap_nr_numero or '',
+                'sap_status': inspeccion.sap_nr_status or '',
+                'sap_mensaje': nr_result.get('mensaje', ''),
+            })
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})

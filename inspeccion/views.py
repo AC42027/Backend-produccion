@@ -90,10 +90,12 @@ def guardar_inspeccion_individual(request):
                 zona=zona,
                 equipo=equipo,
                 observaciones=data.get('observaciones', ''),
-                
-                # ✅ GUARDAR EL OWNER: 
-                # OJO: Asumo que en tu models.py, a la tabla "Inspeccion" le agregaste 
-                # un campo llamado "owner" (como CharField). Si le pusiste otro nombre (ej: usuario), cámbialo aquí.
+                # Nuevos campos SAP:
+                sap_equnr=data.get('sap_equnr', ''),
+                sap_equnr_desc=data.get('sap_equnr_desc', ''),
+                sap_tplnr=data.get('sap_tplnr', ''),
+                sap_puesto_trabajo=data.get('sap_puesto_trabajo', ''),
+                comentario_hallazgo=data.get('comentario_hallazgo', ''),
                 owner=owner_ldap
             )
 

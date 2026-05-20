@@ -13,7 +13,7 @@ from .models import (
     AsignacionInspeccion
 )
 from .serializers import AsignacionInspeccionSerializer
-from .sap_connector import crear_notificacion_sap
+from .sap_connector import crear_notificacion_sap, cerrar_notificacion_sap
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -215,6 +215,12 @@ def inspecciones_dashboard(request):
             'owner': ins.owner if hasattr(ins, 'owner') and ins.owner else '',
             'observaciones': ins.observaciones,
             'tecnicos': list(tecnicos),
+            # Campos SAP PM
+            'sap_nr_numero': ins.sap_nr_numero or '',
+            'sap_nr_status': ins.sap_nr_status or '',
+            'sap_equnr': ins.sap_equnr or '',
+            'sap_tplnr': ins.sap_tplnr or '',
+            'sap_puesto_trabajo': ins.sap_puesto_trabajo or '',
         })
 
     return JsonResponse(data, safe=False)
@@ -252,3 +258,27 @@ class AsignacionesView(APIView):
         
         AsignacionInspeccion.objects.bulk_create(nuevas_asignaciones)
         return Response({"status": "ok", "mensaje": f"Se guardaron {len(nuevas_asignaciones)} asignaciones"}, status=status.HTTP_201_CREATED)
+
+@csrf_exempt
+def cerrar_inspeccion_sap(request, inspeccion_id):
+    """
+    Endpoint para solicitar el cierre de una notificación de SAP.
+    """
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'})
+        
+    if request.method == 'POST':
+        inspeccion = get_object_or_404(Inspeccion, id=inspeccion_id)
+        if not inspeccion.sap_nr_numero:
+            return JsonResponse({'status': 'error', 'message': 'Esta inspección no tiene un aviso de SAP asociado.'}, status=400)
+            
+        res = cerrar_notificacion_sap(inspeccion)
+        if res.get('status') == 'ok':
+            inspeccion.sap_nr_status = 'cerrada'
+            inspeccion.save(update_fields=['sap_nr_status'])
+            return JsonResponse({'status': 'ok', 'message': res.get('mensaje')})
+        else:
+            return JsonResponse({'status': 'error', 'message': res.get('mensaje')}, status=500)
+            
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido. Se requiere POST.'}, status=405)
+

@@ -94,7 +94,7 @@ class Inspeccion(models.Model):
     sap_nr_status = models.CharField(
         max_length=20, blank=True, null=True,
         verbose_name="Estado sincronización SAP",
-        choices=[('creada', 'Creada en SAP'), ('error', 'Error SAP'), ('pendiente', 'Pendiente')]
+        choices=[('creada', 'Creada en SAP'), ('error', 'Error SAP'), ('pendiente', 'Pendiente'), ('cerrada', 'Cerrada en SAP')]
     )
 
     def __str__(self):

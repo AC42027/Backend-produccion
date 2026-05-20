@@ -15,6 +15,7 @@ urlpatterns = [
 
     # 🚀 Dashboard
     path('api/dashboard/inspecciones/', views.inspecciones_dashboard, name='dashboard_inspecciones'),
+    path('api/inspecciones/<int:inspeccion_id>/cerrar/', views.cerrar_inspeccion_sap, name='cerrar_inspeccion_sap'),
 
     # 🔐 Autenticación LDAP
     path('api/login-ldap/', views.login_ldap, name='login_ldap'),

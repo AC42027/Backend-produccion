@@ -278,7 +278,7 @@ def cerrar_inspeccion_sap(request, inspeccion_id):
             inspeccion.save(update_fields=['sap_nr_status'])
             return JsonResponse({'status': 'ok', 'message': res.get('mensaje')})
         else:
-            return JsonResponse({'status': 'error', 'message': res.get('mensaje')}, status=500)
+            return JsonResponse({'status': 'error', 'message': res.get('mensaje')}, status=400)
             
     return JsonResponse({'status': 'error', 'message': 'Método no permitido. Se requiere POST.'}, status=405)
 

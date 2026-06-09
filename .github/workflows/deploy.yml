@@ -1,0 +1,34 @@
+name: Deploy Backend Producción
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull latest changes
+        run: |
+          cd /var/www/html/insp_pry/Backend-produccion
+          git pull origin main
+
+      - name: Install dependencies
+        run: |
+          cd /var/www/html/insp_pry/Backend-produccion
+          ./venv/bin/pip install -r requirements.txt
+
+      - name: Run Database Migrations
+        run: |
+          cd /var/www/html/insp_pry/Backend-produccion
+          ./venv/bin/python manage.py migrate
+
+      - name: Collect Static Files
+        run: |
+          cd /var/www/html/insp_pry/Backend-produccion
+          ./venv/bin/python manage.py collectstatic --noinput
+
+      - name: Restart Backend Service
+        run: |
+          sudo systemctl restart inspecciones.service

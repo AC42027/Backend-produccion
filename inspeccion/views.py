@@ -1,3 +1,7 @@
+import logging
+import json
+from datetime import datetime
+from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -18,15 +22,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-import json
-from datetime import datetime
+logger = logging.getLogger(__name__)
+
 
 @csrf_exempt
 def login_ldap(request):
     # ✅ FIX CORS PREFLIGHT: Next.js siempre envía una petición 'OPTIONS' antes del POST
     # para verificar permisos. Si le devolvemos error aquí, Next.js cancela todo y da "Acceso denegado".
     if request.method == 'OPTIONS':
-        return JsonResponse({'status': 'ok'}) 
+        return JsonResponse({'status': 'ok'})
 
     if request.method == 'POST':
         try:
@@ -35,7 +39,7 @@ def login_ldap(request):
             password = data.get('password')
 
             auth_result = autenticar_usuario(username, password)
-            
+
             if auth_result.get('success'):
                 user, created = User.objects.get_or_create(username=username)
                 user.first_name = auth_result.get('first_name', '')
@@ -43,26 +47,30 @@ def login_ldap(request):
                 user.email = auth_result.get('email', '')
                 user.save()
                 login(request, user)
-                
+
+                is_admin = user.is_staff or user.is_superuser or user.username in ['ac18958', 'ac17157']
                 return JsonResponse({
                     'status': 'ok',
                     'message': 'Login exitoso',
                     'first_name': user.first_name,
                     'last_name': user.last_name,
+                    'is_admin': is_admin,
                 })
             else:
                 return JsonResponse({'status': 'error', 'message': 'Credenciales inválidas'}, status=401)
-                
+
         except json.JSONDecodeError:
             return JsonResponse({'status': 'error', 'message': 'Formato JSON inválido'}, status=400)
 
-    # Si alguien intenta entrar con GET (como desde el navegador), le respondemos en JSON (esto arregla el error de sintaxis en Next.js)
+    # Si alguien intenta entrar con GET (como desde el navegador), respondemos en JSON
     return JsonResponse({'status': 'error', 'message': 'Método no permitido. Se requiere POST.'}, status=405)
+
 
 @csrf_exempt
 def logout_view(request):
     logout(request)
     return JsonResponse({'status': 'ok', 'message': 'Sesión cerrada'})
+
 
 @csrf_exempt
 def guardar_inspeccion_individual(request):
@@ -73,36 +81,82 @@ def guardar_inspeccion_individual(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            
-            # ✅ CAPTURAR EL OWNER: Aquí recibimos el "ac17157" del frontend
-            owner_ldap = data.get('owner', '') 
-            
-            division = Division.objects.get(id=data['division'])
-            area = Area.objects.get(id=data['area'])
-            zona = Zona.objects.get(id=data['zona'])
-            equipo = Equipo.objects.get(id=data['equipo'])
-            
-            inspeccion = Inspeccion.objects.create(
-                fecha=data['fecha'],
-                hora_inicio=parse_time(data['horaInicio']),
-                hora_fin=parse_time(data['horaFin']),
-                division=division,
-                area=area,
-                zona=zona,
-                equipo=equipo,
-                observaciones=data.get('observaciones', ''),
-                # Nuevos campos SAP:
-                sap_equnr=data.get('sap_equnr', ''),
-                sap_equnr_desc=data.get('sap_equnr_desc', ''),
-                sap_tplnr=data.get('sap_tplnr', ''),
-                sap_puesto_trabajo=data.get('sap_puesto_trabajo', ''),
-                comentario_hallazgo=data.get('comentario_hallazgo', ''),
-                owner=owner_ldap
-            )
+            logger.warning(f"[Guardar] Payload recibido: {data}")
 
-            tecnicos_data = data.get('tecnicos', {})
+            # ✅ CAPTURAR EL OWNER: Aquí recibimos el "ac17157" del frontend
+            owner_ldap = data.get('owner', '')
+
+            division = Division.objects.get(id=data['division'])
+            area     = Area.objects.get(id=data['area'])
+            zona     = Zona.objects.get(id=data['zona'])
+            equipo   = Equipo.objects.get(id=data['equipo'])
+            hora_inicio_parseada = parse_time(data['horaInicio'])
+
+            # ──────────────────────────────────────────────────────────────────
+            # 🛡️ GUARD ANTI-DUPLICADO con bloqueo de BD (select_for_update)
+            #
+            # Problema: si el usuario envía el formulario dos veces (doble clic,
+            # error de red + retry, frontend lento), ambas peticiones llegan al
+            # servidor y cada una crea una inspección + llama a SAP → dos avisos.
+            # (Ejemplo: aviso 7000105188 se duplicó por este motivo)
+            #
+            # Solución: dentro de una transacción atómica, buscamos si ya existe
+            # una inspección con la misma clave natural (equipo + fecha + owner +
+            # hora_inicio). Si existe → devolvemos ese resultado sin crear nada.
+            # select_for_update bloquea la fila para que dos requests simultáneos
+            # no pasen el guard al mismo tiempo (condición de carrera).
+            # ──────────────────────────────────────────────────────────────────
+            with transaction.atomic():
+                inspeccion_existente = (
+                    Inspeccion.objects
+                    .select_for_update()
+                    .filter(
+                        equipo=equipo,
+                        fecha=data['fecha'],
+                        owner=owner_ldap,
+                        hora_inicio=hora_inicio_parseada,
+                    )
+                    .order_by('-id')
+                    .first()
+                )
+
+                if inspeccion_existente is not None:
+                    logger.warning(
+                        f"[SAP Guard] Duplicado bloqueado: equipo={equipo.id} "
+                        f"fecha={data['fecha']} owner={owner_ldap} "
+                        f"hora={hora_inicio_parseada} → id existente={inspeccion_existente.id} "
+                        f"SAP={inspeccion_existente.sap_nr_numero or 'sin aviso'}"
+                    )
+                    return JsonResponse({
+                        'status': 'ok',
+                        'message': 'Inspección ya registrada (evitando duplicado)',
+                        'sap_nr': inspeccion_existente.sap_nr_numero or '',
+                        'sap_status': inspeccion_existente.sap_nr_status or '',
+                        'sap_mensaje': f'Aviso SAP ya existente: {inspeccion_existente.sap_nr_numero or "sin aviso"}',
+                    })
+
+                # ── Crear la inspección dentro de la misma transacción ────────
+                inspeccion = Inspeccion.objects.create(
+                    fecha=data['fecha'],
+                    hora_inicio=hora_inicio_parseada,
+                    hora_fin=parse_time(data['horaFin']),
+                    division=division,
+                    area=area,
+                    zona=zona,
+                    equipo=equipo,
+                    observaciones=data.get('observaciones', ''),
+                    sap_equnr=data.get('sap_equnr', ''),
+                    sap_equnr_desc=data.get('sap_equnr_desc', ''),
+                    sap_tplnr=data.get('sap_tplnr', ''),
+                    sap_puesto_trabajo=data.get('sap_puesto_trabajo', ''),
+                    comentario_hallazgo=data.get('comentario_hallazgo', ''),
+                    owner=owner_ldap
+                )
+            # ── Fin bloque atómico ─────────────────────────────────────────────
+
+            tecnicos_data    = data.get('tecnicos', {})
             comentarios_data = data.get('observacionesTecnicas', {})
-            criticos_data = data.get('criticos', {})
+            criticos_data    = data.get('criticos', {})
 
             for descripcion, estado in tecnicos_data.items():
                 InspeccionTecnico.objects.create(
@@ -114,24 +168,36 @@ def guardar_inspeccion_individual(request):
                 )
 
             # --- Integración SAP PM: crear Notificación NR (IW21) ---
-            nr_result = crear_notificacion_sap(inspeccion)
-            inspeccion.sap_nr_numero = nr_result.get('nr_numero', '')
-            inspeccion.sap_nr_status = nr_result.get('status', 'error')
-            inspeccion.save(update_fields=['sap_nr_numero', 'sap_nr_status'])
+            # Solo crear aviso SAP si hay al menos un hallazgo NOK o un ítem
+            # crítico, Y si todavía no tiene un número de aviso asignado.
+            tiene_hallazgo = any(
+                estado == 'NOK' for estado in tecnicos_data.values()
+            ) or any(
+                criticos_data.get(desc, False) for desc in tecnicos_data.keys()
+            )
+
+            if tiene_hallazgo and not inspeccion.sap_nr_numero:
+                nr_result = crear_notificacion_sap(inspeccion)
+                inspeccion.sap_nr_numero = nr_result.get('nr_numero', '')
+                inspeccion.sap_nr_status = nr_result.get('status', 'error')
+                inspeccion.save(update_fields=['sap_nr_numero', 'sap_nr_status'])
+            else:
+                nr_result = {}
 
             return JsonResponse({
                 'status': 'ok',
                 'message': 'Inspección guardada',
                 'sap_nr': inspeccion.sap_nr_numero or '',
                 'sap_status': inspeccion.sap_nr_status or '',
-                'sap_mensaje': nr_result.get('mensaje', ''),
+                'sap_mensaje': nr_result.get('mensaje', 'Sin hallazgos NOK/Críticos, no se creó aviso SAP.'),
             })
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
 
+
 def parse_time(hora_str):
-    formatos = ['%H:%M:%S', '%I:%M:%S %p']
+    formatos = ['%H:%M:%S', '%I:%M:%S %p', '%H:%M']
     for fmt in formatos:
         try:
             return datetime.strptime(hora_str, fmt).time()
@@ -139,17 +205,22 @@ def parse_time(hora_str):
             continue
     raise ValueError(f"Hora inválida: {hora_str}")
 
+
 def listar_divisiones(request):
     return JsonResponse(list(Division.objects.values('id', 'nombre')), safe=False)
+
 
 def listar_areas(request):
     return JsonResponse(list(Area.objects.values('id', 'nombre')), safe=False)
 
+
 def listar_zonas(request):
     return JsonResponse(list(Zona.objects.values('id', 'nombre')), safe=False)
 
+
 def listar_categorias(request):
     return JsonResponse(list(Categoria.objects.values('id', 'nombre')), safe=False)
+
 
 def listar_equipos(request):
     equipos = Equipo.objects.select_related(
@@ -174,6 +245,7 @@ def listar_equipos(request):
     ]
     return JsonResponse(data, safe=False)
 
+
 def obtener_equipo(request, equipo_id):
     equipo = get_object_or_404(
         Equipo.objects.select_related(
@@ -192,10 +264,12 @@ def obtener_equipo(request, equipo_id):
         'owner': equipo.owner.nombre if equipo.owner else ''
     })
 
+
 def obtener_preguntas_por_categoria(request, categoria_nombre):
     preguntas = PreguntaTecnica.objects.filter(categoria__nombre=categoria_nombre)
     data = list(preguntas.values('id', 'descripcion'))
     return JsonResponse(data, safe=False)
+
 
 def inspecciones_dashboard(request):
     inspecciones = Inspeccion.objects.select_related('division', 'area', 'zona', 'equipo').all()
@@ -225,6 +299,7 @@ def inspecciones_dashboard(request):
 
     return JsonResponse(data, safe=False)
 
+
 class AsignacionesView(APIView):
     def get(self, request):
         fecha_filtro = request.query_params.get('fecha', None)
@@ -232,14 +307,14 @@ class AsignacionesView(APIView):
             asignaciones = AsignacionInspeccion.objects.filter(fecha=fecha_filtro)
         else:
             asignaciones = AsignacionInspeccion.objects.all()
-            
+
         serializer = AsignacionInspeccionSerializer(asignaciones, many=True)
         return Response(serializer.data)
 
     def post(self, request):
         fecha = request.data.get('fecha')
         asignaciones_data = request.data.get('asignaciones', [])
-        
+
         if not fecha:
             return Response({"error": "Falta el campo 'fecha'"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -255,9 +330,10 @@ class AsignacionesView(APIView):
                 zona=item.get('zona'),
                 asignado_por=request.data.get('asignado_por', 'Admin')
             ))
-        
+
         AsignacionInspeccion.objects.bulk_create(nuevas_asignaciones)
         return Response({"status": "ok", "mensaje": f"Se guardaron {len(nuevas_asignaciones)} asignaciones"}, status=status.HTTP_201_CREATED)
+
 
 @csrf_exempt
 def cerrar_inspeccion_sap(request, inspeccion_id):
@@ -266,12 +342,12 @@ def cerrar_inspeccion_sap(request, inspeccion_id):
     """
     if request.method == 'OPTIONS':
         return JsonResponse({'status': 'ok'})
-        
+
     if request.method == 'POST':
         inspeccion = get_object_or_404(Inspeccion, id=inspeccion_id)
         if not inspeccion.sap_nr_numero:
             return JsonResponse({'status': 'error', 'message': 'Esta inspección no tiene un aviso de SAP asociado.'}, status=400)
-            
+
         res = cerrar_notificacion_sap(inspeccion)
         if res.get('status') == 'ok':
             inspeccion.sap_nr_status = 'cerrada'
@@ -279,6 +355,5 @@ def cerrar_inspeccion_sap(request, inspeccion_id):
             return JsonResponse({'status': 'ok', 'message': res.get('mensaje')})
         else:
             return JsonResponse({'status': 'error', 'message': res.get('mensaje')}, status=400)
-            
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido. Se requiere POST.'}, status=405)
 
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido. Se requiere POST.'}, status=405)

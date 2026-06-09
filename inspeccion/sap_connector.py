@@ -220,7 +220,8 @@ def crear_notificacion_sap(inspeccion):
         'userid': userid,
         'descrip': descrip,
         'wkctr': (inspeccion.sap_puesto_trabajo or '').strip().upper(),
-        'label': str(inspeccion.id)
+        'label': str(inspeccion.id),
+        'tipo': 'N2'
     }
 
     try:
@@ -228,7 +229,7 @@ def crear_notificacion_sap(inspeccion):
         # Hacemos POST para soportar descripciones largas sin límites de URL
         resp = requests.post(bridge_url, data=params, timeout=30)
         
-        logger.debug(f"[SAP Puente] HTTP {resp.status_code}: {resp.text[:500]}")
+        logger.warning(f"[SAP Puente] HTTP {resp.status_code}: {resp.text[:500]}")
 
         if resp.status_code == 200:
             import re

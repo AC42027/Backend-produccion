@@ -1,0 +1,11 @@
+<%@ page language="java" contentType="text/html; charset=Windows-31J"%>
+<%@ page import="java.util.Date,
+         java.text.SimpleDateFormat,
+         java.io.File, 
+         java.io.FileOutputStream,
+         java.util.Properties, 
+         com.sap.conn.jco.*"
+ %>
+<%
+    String Equnr = request.getParameter("equnr");
+<truncated 5406 bytes>

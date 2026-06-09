@@ -122,13 +122,15 @@ ALLOWED_IP_PREFIXES = [
 
 # Lista de nombres de equipos (Hostnames) permitidos
 ALLOWED_DYNAMIC_HOSTNAMES = [
-    'CL01NL1826.la.ad.goodyear.com',  # Tu equipo
+    'CL01NL1826.la.ad.goodyear.com',  # Equipo Diego
     'CL01NL1981.la.ad.goodyear.com',  # PC turno
+    'CL01NL1884.la.ad.goodyear.com',
 ]
 
 # Rutas que pueden ser accedidas desde cualquier IP
 EXEMPT_IP_RESTRICTION_PATHS = [
     '/api/dashboard/inspecciones/',
+    '/api/login-ldap/'
 ]
 
 # Jazzmin settings

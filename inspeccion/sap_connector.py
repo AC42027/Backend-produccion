@@ -14,6 +14,7 @@ import logging
 import datetime
 import requests
 import xml.etree.ElementTree as ET
+import unicodedata
 from requests.auth import HTTPBasicAuth
 from decouple import config
 
@@ -22,6 +23,22 @@ logger = logging.getLogger(__name__)
 # Namespace SAP SOAP
 NS_SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
 NS_SAP  = "urn:sap-com:document:sap:soap:functions:mc-style"
+
+def normalizar_para_sap(texto):
+    """
+    Normaliza el texto reemplazando eñes por n y removiendo tildes
+    para evitar problemas de visualización en SAP PM y SAP GUI.
+    """
+    if not texto:
+        return ""
+    # Reemplazo explícito de eñes
+    texto = texto.replace("ñ", "n").replace("Ñ", "N")
+    # Remover tildes usando descompocisión Unicode NFD
+    texto_normalizado = "".join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
+    return texto_normalizado
 
 
 def _get_sap_config():
@@ -200,7 +217,8 @@ def crear_notificacion_sap(inspeccion):
 
     # Construir parámetros para el JSP exclusivo de inspecciones (BAPI estándar)
     equipo_nombre = inspeccion.equipo.nombre if inspeccion.equipo else 'EQUIPO'
-    title  = f"Insp. {equipo_nombre} {inspeccion.fecha}"[:40]
+    raw_title  = f"Insp. {equipo_nombre} {inspeccion.fecha}"[:40]
+    title = normalizar_para_sap(raw_title)
     userid = (inspeccion.owner or 'SYSTEM').strip().upper()
 
     # Descripción: comentario + ítems NOK
@@ -210,7 +228,8 @@ def crear_notificacion_sap(inspeccion):
     nok_items = inspeccion.revisiones.filter(estado='NOK').values_list('descripcion', flat=True)
     if nok_items:
         descrip_parts.append('Hallazgos: ' + ', '.join(nok_items))
-    descrip = ' | '.join(descrip_parts) or f"Inspección #{inspeccion.id}"
+    raw_descrip = ' | '.join(descrip_parts) or f"Inspección #{inspeccion.id}"
+    descrip = normalizar_para_sap(raw_descrip)
 
     # Parámetros para enviar al nuevo JSP estándar
     params = {
@@ -226,8 +245,11 @@ def crear_notificacion_sap(inspeccion):
 
     try:
         logger.info(f"[SAP Puente] Enviando datos a {bridge_url} - Machine: {machine}")
-        # Hacemos POST para soportar descripciones largas sin límites de URL
-        resp = requests.post(bridge_url, data=params, timeout=30)
+        # Hacemos POST forzando codificación UTF-8 en las cabeceras HTTP
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        }
+        resp = requests.post(bridge_url, data=params, headers=headers, timeout=30)
         
         logger.warning(f"[SAP Puente] HTTP {resp.status_code}: {resp.text[:500]}")
 

@@ -221,19 +221,20 @@ def crear_notificacion_sap(inspeccion):
     title = normalizar_para_sap(raw_title)
     userid = (inspeccion.owner or 'SYSTEM').strip().upper()
 
-    # Descripción: comentario + ítems NOK
+    # Descripción: comentario + ítems NOK ordenados
     descrip_parts = []
-    if inspeccion.comentario_hallazgo:
-        descrip_parts.append(f"Comentario General: {inspeccion.comentario_hallazgo.strip()}")
     
     nok_revisiones = inspeccion.revisiones.filter(estado='NOK')
-    if nok_revisiones.exists():
-        descrip_parts.append("Hallazgos NOK:")
-        for rev in nok_revisiones:
-            linea = f"- {rev.descripcion.strip()}"
-            if rev.comentario and rev.comentario.strip():
-                linea += f" (Comentario: {rev.comentario.strip()})"
-            descrip_parts.append(linea)
+    for idx, rev in enumerate(nok_revisiones, 1):
+        linea = f"Item {idx} - {rev.descripcion.strip()}"
+        if rev.comentario and rev.comentario.strip():
+            linea += f", {rev.comentario.strip()}"
+        descrip_parts.append(linea)
+        
+    if inspeccion.comentario_hallazgo and inspeccion.comentario_hallazgo.strip():
+        if descrip_parts:
+            descrip_parts.append("")  # Línea en blanco separadora
+        descrip_parts.append(f"Comentario General: {inspeccion.comentario_hallazgo.strip()}")
             
     raw_descrip = '\r\n'.join(descrip_parts) or f"Inspeccion #{inspeccion.id}"
     descrip = normalizar_para_sap(raw_descrip)

@@ -222,7 +222,10 @@ def crear_notificacion_sap(inspeccion):
     userid = (inspeccion.owner or 'SYSTEM').strip().upper()
 
     # Descripción: comentario + ítems NOK ordenados
-    descrip_parts = []
+    descrip_parts = [
+        "[ DETALLES DE LA INSPECCION ]",
+        ""  # Salto de línea para dar aire
+    ]
     
     nok_revisiones = inspeccion.revisiones.filter(estado='NOK')
     for idx, rev in enumerate(nok_revisiones, 1):
@@ -232,12 +235,11 @@ def crear_notificacion_sap(inspeccion):
         descrip_parts.append(linea)
         
     if inspeccion.observaciones and inspeccion.observaciones.strip():
-        if descrip_parts:
+        if len(descrip_parts) > 2:
             descrip_parts.append("")  # Línea en blanco separadora
         descrip_parts.append(f"Comentario General: {inspeccion.observaciones.strip()}")
             
-    joined_text = '\r\n'.join(descrip_parts) or f"Inspeccion #{inspeccion.id}"
-    raw_descrip = f"\r\n___________________________________\r\n{joined_text}"  # Línea separadora inicial para forzar salto limpio en SAP
+    raw_descrip = '\r\n'.join(descrip_parts) or f"Inspeccion #{inspeccion.id}"
     descrip = normalizar_para_sap(raw_descrip)
 
     # Parámetros para enviar al nuevo JSP estándar

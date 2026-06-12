@@ -237,7 +237,7 @@ def crear_notificacion_sap(inspeccion):
         descrip_parts.append(f"Comentario General: {inspeccion.observaciones.strip()}")
             
     joined_text = '\r\n'.join(descrip_parts) or f"Inspeccion #{inspeccion.id}"
-    raw_descrip = f"\r\n{joined_text}"  # Iniciar con un enter para orden en SAP PM
+    raw_descrip = f"\r\n___________________________________\r\n{joined_text}"  # Línea separadora inicial para forzar salto limpio en SAP
     descrip = normalizar_para_sap(raw_descrip)
 
     # Parámetros para enviar al nuevo JSP estándar

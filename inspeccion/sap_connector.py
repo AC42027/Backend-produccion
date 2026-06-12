@@ -224,11 +224,18 @@ def crear_notificacion_sap(inspeccion):
     # Descripción: comentario + ítems NOK
     descrip_parts = []
     if inspeccion.comentario_hallazgo:
-        descrip_parts.append(inspeccion.comentario_hallazgo.strip())
-    nok_items = inspeccion.revisiones.filter(estado='NOK').values_list('descripcion', flat=True)
-    if nok_items:
-        descrip_parts.append('Hallazgos: ' + ', '.join(nok_items))
-    raw_descrip = ' | '.join(descrip_parts) or f"Inspección #{inspeccion.id}"
+        descrip_parts.append(f"Comentario General: {inspeccion.comentario_hallazgo.strip()}")
+    
+    nok_revisiones = inspeccion.revisiones.filter(estado='NOK')
+    if nok_revisiones.exists():
+        descrip_parts.append("Hallazgos NOK:")
+        for rev in nok_revisiones:
+            linea = f"- {rev.descripcion.strip()}"
+            if rev.comentario and rev.comentario.strip():
+                linea += f" (Comentario: {rev.comentario.strip()})"
+            descrip_parts.append(linea)
+            
+    raw_descrip = '\r\n'.join(descrip_parts) or f"Inspeccion #{inspeccion.id}"
     descrip = normalizar_para_sap(raw_descrip)
 
     # Parámetros para enviar al nuevo JSP estándar

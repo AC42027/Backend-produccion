@@ -277,6 +277,14 @@ def inspecciones_dashboard(request):
 
     for ins in inspecciones:
         tecnicos = InspeccionTecnico.objects.filter(inspeccion=ins).values('descripcion', 'estado', 'comentario', 'es_critico')
+        
+        # Obtener nombre completo del owner si está registrado en los usuarios de Django (LDAP)
+        owner_str = ins.owner if hasattr(ins, 'owner') and ins.owner else ''
+        if owner_str:
+            user_obj = User.objects.filter(username=owner_str).first()
+            if user_obj and (user_obj.first_name or user_obj.last_name):
+                owner_str = f"{owner_str} ({user_obj.first_name} {user_obj.last_name})".strip()
+
         data.append({
             'id': ins.id,
             'fecha': ins.fecha.strftime('%Y-%m-%d'),
@@ -286,7 +294,7 @@ def inspecciones_dashboard(request):
             'area': ins.area.nombre,
             'zona': ins.zona.nombre,
             'equipo': ins.equipo.nombre,
-            'owner': ins.owner if hasattr(ins, 'owner') and ins.owner else '',
+            'owner': owner_str,
             'observaciones': ins.observaciones,
             'tecnicos': list(tecnicos),
             # Campos SAP PM

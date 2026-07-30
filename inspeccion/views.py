@@ -49,11 +49,13 @@ def login_ldap(request):
                 login(request, user)
 
                 is_admin = user.is_staff or user.is_superuser or user.username in ['ac18958', 'ac17157']
+                full_name = f"{user.first_name} {user.last_name}".strip()
                 return JsonResponse({
                     'status': 'ok',
                     'message': 'Login exitoso',
                     'first_name': user.first_name,
                     'last_name': user.last_name,
+                    'full_name': full_name,
                     'is_admin': is_admin,
                 })
             else:
@@ -310,9 +312,19 @@ def inspecciones_dashboard(request):
 
 class AsignacionesView(APIView):
     def get(self, request):
-        fecha_filtro = request.query_params.get('fecha', None)
-        if fecha_filtro:
-            asignaciones = AsignacionInspeccion.objects.filter(fecha=fecha_filtro)
+        mes = request.query_params.get('mes', None)
+        fecha = request.query_params.get('fecha', None)
+
+        if mes:
+            try:
+                año, mes_num = mes.split('-')
+                asignaciones = AsignacionInspeccion.objects.filter(
+                    fecha__year=año, fecha__month=mes_num
+                )
+            except (ValueError, IndexError):
+                return Response({"error": "Formato de mes inválido. Use YYYY-MM"}, status=status.HTTP_400_BAD_REQUEST)
+        elif fecha:
+            asignaciones = AsignacionInspeccion.objects.filter(fecha=fecha)
         else:
             asignaciones = AsignacionInspeccion.objects.all()
 

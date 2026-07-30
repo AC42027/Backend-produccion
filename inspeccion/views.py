@@ -356,6 +356,20 @@ class AsignacionesView(APIView):
 
 
 @csrf_exempt
+def eliminar_asignacion(request, asignacion_id):
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'})
+    if request.method == 'DELETE':
+        try:
+            asignacion = get_object_or_404(AsignacionInspeccion, id=asignacion_id)
+            asignacion.delete()
+            return JsonResponse({'status': 'ok', 'message': 'Asignación eliminada'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+
+
+@csrf_exempt
 def cerrar_inspeccion_sap(request, inspeccion_id):
     """
     Endpoint para solicitar el cierre de una notificación de SAP.

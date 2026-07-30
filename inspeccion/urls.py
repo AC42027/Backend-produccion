@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path('api/asignaciones/', AsignacionesView.as_view(), name='asignaciones_api'),
+    path('api/asignaciones/<int:asignacion_id>/eliminar/', views.eliminar_asignacion, name='eliminar_asignacion'),
     path('api/guardar/', views.guardar_inspeccion_individual, name='guardar_inspeccion'),
     path('api/divisiones/', views.listar_divisiones, name='listar_divisiones'),
     path('api/areas/', views.listar_areas, name='listar_areas'),

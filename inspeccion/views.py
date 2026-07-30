@@ -408,6 +408,10 @@ class EquipoPlanificacionView(APIView):
         return Response({'nombres': equipo.lista_nombres})
 
 
+from django.utils.decorators import method_decorator
+
+
+@method_decorator(csrf_exempt, name='dispatch')
 class EquipoSinQRList(APIView):
     def get(self, request):
         equipos = EquipoSinQR.objects.all()
@@ -415,6 +419,7 @@ class EquipoSinQRList(APIView):
         return Response(serializer.data)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class EquipoSinQRDelete(APIView):
     def delete(self, request, pk):
         equipo = get_object_or_404(EquipoSinQR, pk=pk)

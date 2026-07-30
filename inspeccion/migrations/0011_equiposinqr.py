@@ -5,6 +5,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('inspeccion', '0010_inspeccion_sap_nr_numero_inspeccion_sap_nr_status'),
+        ('inspeccion', '0010_equipoplanificacion'),
     ]
 
     operations = [

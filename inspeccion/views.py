@@ -14,9 +14,9 @@ from .ldap_auth import autenticar_usuario
 from .models import (
     Division, Area, Zona, Equipo, Inspeccion, Categoria,
     InspeccionTecnico, PreguntaTecnica, UbicacionFisica, Owner,
-    AsignacionInspeccion
+    AsignacionInspeccion, EquipoPlanificacion
 )
-from .serializers import AsignacionInspeccionSerializer
+from .serializers import AsignacionInspeccionSerializer, EquipoPlanificacionSerializer
 from .sap_connector import crear_notificacion_sap, cerrar_notificacion_sap
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -391,3 +391,18 @@ def cerrar_inspeccion_sap(request, inspeccion_id):
             return JsonResponse({'status': 'error', 'message': res.get('mensaje')}, status=400)
 
     return JsonResponse({'status': 'error', 'message': 'Método no permitido. Se requiere POST.'}, status=405)
+
+
+class EquipoPlanificacionView(APIView):
+    def get(self, request):
+        equipo, _ = EquipoPlanificacion.objects.get_or_create(pk=1)
+        serializer = EquipoPlanificacionSerializer(equipo)
+        return Response(serializer.data)
+
+    def put(self, request):
+        equipo, _ = EquipoPlanificacion.objects.get_or_create(pk=1)
+        serializer = EquipoPlanificacionSerializer(equipo, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

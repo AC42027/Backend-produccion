@@ -125,3 +125,14 @@ class AsignacionInspeccion(models.Model):
 
     def __str__(self):
         return f"{self.fecha} - {self.asociado} - {self.equipo}"
+
+
+class EquipoPlanificacion(models.Model):
+    nombres = models.JSONField(default=list, help_text="Lista de nombres del equipo de planificación")
+
+    class Meta:
+        verbose_name = "Equipo de Planificación"
+        verbose_name_plural = "Equipo de Planificación"
+
+    def __str__(self):
+        return f"Equipo ({len(self.nombres)} miembros)"

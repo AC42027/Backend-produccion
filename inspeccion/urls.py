@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import AsignacionesView
+from .views import AsignacionesView, EquipoPlanificacionView
 from . import views
 
 urlpatterns = [
@@ -21,4 +21,5 @@ urlpatterns = [
     # 🔐 Autenticación LDAP
     path('api/login-ldap/', views.login_ldap, name='login_ldap'),
     path('api/logout/', views.logout_view, name='logout_view'),
+    path('api/equipo/', EquipoPlanificacionView.as_view(), name='equipo_api'),
 ]

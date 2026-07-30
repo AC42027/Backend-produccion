@@ -418,6 +418,13 @@ class EquipoSinQRList(APIView):
         serializer = EquipoSinQRSerializer(equipos, many=True)
         return Response(serializer.data)
 
+    def post(self, request):
+        serializer = EquipoSinQRSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EquipoSinQRDelete(APIView):

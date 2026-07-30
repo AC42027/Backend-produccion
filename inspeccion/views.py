@@ -413,6 +413,8 @@ from django.utils.decorators import method_decorator
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EquipoSinQRList(APIView):
+    authentication_classes = []
+
     def get(self, request):
         equipos = EquipoSinQR.objects.all()
         serializer = EquipoSinQRSerializer(equipos, many=True)
@@ -428,6 +430,8 @@ class EquipoSinQRList(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EquipoSinQRDelete(APIView):
+    authentication_classes = []
+
     def delete(self, request, pk):
         equipo = get_object_or_404(EquipoSinQR, pk=pk)
         equipo.delete()

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AsignacionInspeccion, EquipoPlanificacion
+from .models import AsignacionInspeccion, EquipoPlanificacion, EquipoSinQR
 
 class AsignacionInspeccionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -9,4 +9,9 @@ class AsignacionInspeccionSerializer(serializers.ModelSerializer):
 class EquipoPlanificacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = EquipoPlanificacion
+        fields = '__all__'
+
+class EquipoSinQRSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EquipoSinQR
         fields = '__all__'

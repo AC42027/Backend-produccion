@@ -144,3 +144,21 @@ class EquipoPlanificacion(models.Model):
     @lista_nombres.setter
     def lista_nombres(self, value):
         self.nombres = '\n'.join(value)
+
+
+class EquipoSinQR(models.Model):
+    equipo_nombre = models.CharField(max_length=255)
+    usuario = models.CharField(max_length=100)
+    usuario_nombre = models.CharField(max_length=255)
+    fecha = models.DateField()
+    hora = models.TimeField()
+    comentario = models.TextField(blank=True, null=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+        verbose_name = "Equipo sin QR"
+        verbose_name_plural = "Equipos sin QR"
+
+    def __str__(self):
+        return f"{self.equipo_nombre} - {self.fecha}"

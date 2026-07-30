@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('inspeccion', '0009_inspeccion_comentario_hallazgo_inspeccion_sap_equnr_and_more'),
+        ('inspeccion', '0010_inspeccion_sap_nr_numero_inspeccion_sap_nr_status'),
     ]
 
     operations = [

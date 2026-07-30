@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
             name='EquipoPlanificacion',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('nombres', models.JSONField(default=list, help_text='Lista de nombres del equipo de planificación')),
+                ('nombres', models.JSONField(default=list, help_text='Lista de nombres del equipo de planificacion')),
             ],
             options={
-                'verbose_name': 'Equipo de Planificación',
-                'verbose_name_plural': 'Equipo de Planificación',
+                'verbose_name': 'Equipo de Planificacion',
+                'verbose_name_plural': 'Equipo de Planificacion',
             },
         ),
     ]

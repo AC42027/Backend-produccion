@@ -14,9 +14,9 @@ from .ldap_auth import autenticar_usuario
 from .models import (
     Division, Area, Zona, Equipo, Inspeccion, Categoria,
     InspeccionTecnico, PreguntaTecnica, UbicacionFisica, Owner,
-    AsignacionInspeccion, EquipoPlanificacion
+    AsignacionInspeccion, EquipoPlanificacion, EquipoSinQR
 )
-from .serializers import AsignacionInspeccionSerializer
+from .serializers import AsignacionInspeccionSerializer, EquipoSinQRSerializer
 from .sap_connector import crear_notificacion_sap, cerrar_notificacion_sap
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -406,3 +406,17 @@ class EquipoPlanificacionView(APIView):
         equipo.lista_nombres = nombres
         equipo.save()
         return Response({'nombres': equipo.lista_nombres})
+
+
+class EquipoSinQRList(APIView):
+    def get(self, request):
+        equipos = EquipoSinQR.objects.all()
+        serializer = EquipoSinQRSerializer(equipos, many=True)
+        return Response(serializer.data)
+
+
+class EquipoSinQRDelete(APIView):
+    def delete(self, request, pk):
+        equipo = get_object_or_404(EquipoSinQR, pk=pk)
+        equipo.delete()
+        return Response({'status': 'ok', 'message': 'Equipo sin QR eliminado.'})

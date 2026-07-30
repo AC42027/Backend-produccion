@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import AsignacionesView, EquipoPlanificacionView, EquipoSinQRList.as_view(), EquipoSinQRCreate.as_view()
+from .views import AsignacionesView, EquipoPlanificacionView, EquipoSinQRList, EquipoSinQRDelete
 from . import views
 
 urlpatterns = [

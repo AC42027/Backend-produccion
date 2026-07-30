@@ -128,11 +128,19 @@ class AsignacionInspeccion(models.Model):
 
 
 class EquipoPlanificacion(models.Model):
-    nombres = models.JSONField(default=list, help_text="Lista de nombres del equipo de planificación")
+    nombres = models.TextField(blank=True, default='', help_text="Lista de nombres del equipo, separados por salto de linea")
 
     class Meta:
-        verbose_name = "Equipo de Planificación"
-        verbose_name_plural = "Equipo de Planificación"
+        verbose_name = "Equipo de Planificacion"
+        verbose_name_plural = "Equipo de Planificacion"
 
     def __str__(self):
-        return f"Equipo ({len(self.nombres)} miembros)"
+        return f"Equipo ({len(self.lista_nombres)} miembros)"
+
+    @property
+    def lista_nombres(self):
+        return [n.strip() for n in self.nombres.split('\n') if n.strip()]
+
+    @lista_nombres.setter
+    def lista_nombres(self, value):
+        self.nombres = '\n'.join(value)

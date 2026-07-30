@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name='EquipoPlanificacion',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('nombres', models.JSONField(default=list, help_text='Lista de nombres del equipo de planificacion')),
+                ('nombres', models.TextField(blank=True, default='', help_text='Lista de nombres del equipo, separados por salto de linea')),
             ],
             options={
                 'verbose_name': 'Equipo de Planificacion',

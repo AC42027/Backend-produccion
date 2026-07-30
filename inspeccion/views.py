@@ -16,7 +16,7 @@ from .models import (
     InspeccionTecnico, PreguntaTecnica, UbicacionFisica, Owner,
     AsignacionInspeccion, EquipoPlanificacion
 )
-from .serializers import AsignacionInspeccionSerializer, EquipoPlanificacionSerializer
+from .serializers import AsignacionInspeccionSerializer
 from .sap_connector import crear_notificacion_sap, cerrar_notificacion_sap
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -396,13 +396,13 @@ def cerrar_inspeccion_sap(request, inspeccion_id):
 class EquipoPlanificacionView(APIView):
     def get(self, request):
         equipo, _ = EquipoPlanificacion.objects.get_or_create(pk=1)
-        serializer = EquipoPlanificacionSerializer(equipo)
-        return Response(serializer.data)
+        return Response({'nombres': equipo.lista_nombres})
 
     def put(self, request):
         equipo, _ = EquipoPlanificacion.objects.get_or_create(pk=1)
-        serializer = EquipoPlanificacionSerializer(equipo, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        nombres = request.data.get('nombres', [])
+        if not isinstance(nombres, list):
+            return Response({'error': 'nombres debe ser una lista'}, status=status.HTTP_400_BAD_REQUEST)
+        equipo.lista_nombres = nombres
+        equipo.save()
+        return Response({'nombres': equipo.lista_nombres})

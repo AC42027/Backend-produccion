@@ -8,7 +8,6 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
 from .ldap_auth import autenticar_usuario
 
 from .models import (
@@ -17,6 +16,7 @@ from .models import (
     AsignacionInspeccion, EquipoPlanificacion, EquipoSinQR
 )
 from .serializers import AsignacionInspeccionSerializer, EquipoSinQRSerializer
+from .authentication import EquipoSinQRAuthentication
 from .sap_connector import crear_notificacion_sap, cerrar_notificacion_sap
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -408,12 +408,8 @@ class EquipoPlanificacionView(APIView):
         return Response({'nombres': equipo.lista_nombres})
 
 
-from django.utils.decorators import method_decorator
-
-
-@method_decorator(csrf_exempt, name='dispatch')
 class EquipoSinQRList(APIView):
-    authentication_classes = []
+    authentication_classes = [EquipoSinQRAuthentication]
 
     def get(self, request):
         equipos = EquipoSinQR.objects.all()
@@ -428,9 +424,8 @@ class EquipoSinQRList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class EquipoSinQRDelete(APIView):
-    authentication_classes = []
+    authentication_classes = [EquipoSinQRAuthentication]
 
     def delete(self, request, pk):
         equipo = get_object_or_404(EquipoSinQR, pk=pk)

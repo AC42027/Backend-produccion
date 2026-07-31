@@ -3,6 +3,7 @@ from pathlib import Path  # type: ignore
 from decouple import config
 from decouple import Csv as CsvParser
 import pymysql
+from corsheaders.defaults import default_headers
 
 pymysql.install_as_MySQLdb()
 
@@ -86,6 +87,9 @@ if not CORS_ALLOW_ALL_ORIGINS:
     CORS_ALLOWED_ORIGINS = CsvParser()(config('CORS_ALLOWED_ORIGINS', default=''))
     print("✔️ CORS_ALLOWED_ORIGINS:", CORS_ALLOWED_ORIGINS)
 
+# Incluir el header de token de API en los preflights CORS
+CORS_ALLOW_HEADERS = [*default_headers, 'x-api-token']
+
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
@@ -132,6 +136,9 @@ EXEMPT_IP_RESTRICTION_PATHS = [
     '/api/dashboard/inspecciones/',
     '/api/login-ldap/'
 ]
+
+# Token de API compartido para los endpoints de "Equipos sin QR"
+EQUIPO_SIN_QR_API_TOKEN = config('EQUIPO_SIN_QR_API_TOKEN', default='fxoNqZPOR7nxwAYrbqFTONNEjUO2I1Hv3Wm34YGrEL4')
 
 # Jazzmin settings
 JAZZMIN_SETTINGS = {

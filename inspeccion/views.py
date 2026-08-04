@@ -48,7 +48,7 @@ def login_ldap(request):
                 user.save()
                 login(request, user)
 
-                is_admin = user.is_staff or user.is_superuser or user.username in ['ac18958', 'ac17157']
+                is_admin = user.is_staff or user.is_superuser or user.username in ['ac18958', 'ac17157', 'aa05016']
                 full_name = f"{user.first_name} {user.last_name}".strip()
                 return JsonResponse({
                     'status': 'ok',

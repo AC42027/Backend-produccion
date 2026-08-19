@@ -122,6 +122,9 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 ALLOWED_IP_PREFIXES = [
     '10.107.205.',
     '10.107.204.',
+    '10.107.',
+    '127.0.0.1',
+    'localhost',
 ]
 
 # Lista de nombres de equipos (Hostnames) permitidos
@@ -134,7 +137,9 @@ ALLOWED_DYNAMIC_HOSTNAMES = [
 # Rutas que pueden ser accedidas desde cualquier IP
 EXEMPT_IP_RESTRICTION_PATHS = [
     '/api/dashboard/inspecciones/',
-    '/api/login-ldap/'
+    '/api/login-ldap/',
+    '/api/asignaciones/',
+    '/api/equipos/',
 ]
 
 # Token de API compartido para los endpoints de "Equipos sin QR"

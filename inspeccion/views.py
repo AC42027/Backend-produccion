@@ -334,25 +334,52 @@ class AsignacionesView(APIView):
     def post(self, request):
         fecha = request.data.get('fecha')
         asignaciones_data = request.data.get('asignaciones', [])
+        reemplazar_todo = request.data.get('reemplazar_todo', False)
 
         if not fecha:
             return Response({"error": "Falta el campo 'fecha'"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Eliminar previas de esa semana
-        AsignacionInspeccion.objects.filter(fecha=fecha).delete()
+        # Solo eliminar previas si se solicita explícitamente reemplazar todo (ej. generación automática completa)
+        if reemplazar_todo:
+            fechas_payload = set(item.get('fecha') for item in asignaciones_data if item.get('fecha'))
+            if not fechas_payload:
+                fechas_payload = {fecha}
+            AsignacionInspeccion.objects.filter(fecha__in=fechas_payload).delete()
 
-        nuevas_asignaciones = []
+        procesadas = []
         for item in asignaciones_data:
-            nuevas_asignaciones.append(AsignacionInspeccion(
-                fecha=fecha,
-                asociado=item.get('asociado'),
-                equipo=item.get('equipo'),
-                zona=item.get('zona'),
-                asignado_por=request.data.get('asignado_por', 'Admin')
-            ))
+            item_fecha = item.get('fecha') or fecha
+            asociado = (item.get('asociado') or '').strip()
+            equipo = (item.get('equipo') or '').strip()
+            zona = (item.get('zona') or '').strip()
 
-        AsignacionInspeccion.objects.bulk_create(nuevas_asignaciones)
-        return Response({"status": "ok", "mensaje": f"Se guardaron {len(nuevas_asignaciones)} asignaciones"}, status=status.HTTP_201_CREATED)
+            if not equipo:
+                continue
+
+            if reemplazar_todo:
+                procesadas.append(AsignacionInspeccion(
+                    fecha=item_fecha,
+                    asociado=asociado,
+                    equipo=equipo,
+                    zona=zona,
+                    asignado_por=request.data.get('asignado_por', 'Admin')
+                ))
+            else:
+                obj, _ = AsignacionInspeccion.objects.update_or_create(
+                    fecha=item_fecha,
+                    equipo=equipo,
+                    defaults={
+                        'asociado': asociado,
+                        'zona': zona,
+                        'asignado_por': request.data.get('asignado_por', 'Admin')
+                    }
+                )
+                procesadas.append(obj)
+
+        if reemplazar_todo and procesadas:
+            AsignacionInspeccion.objects.bulk_create(procesadas)
+
+        return Response({"status": "ok", "mensaje": f"Se guardaron {len(procesadas)} asignaciones"}, status=status.HTTP_201_CREATED)
 
 
 @csrf_exempt

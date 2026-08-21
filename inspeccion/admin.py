@@ -1,8 +1,9 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from .models import (
     Division, Area, Zona, Equipo, Inspeccion, UbicacionFisica,
     Categoria, InspeccionTecnico, PreguntaTecnica, Owner
 )
+from . import sap_assets
 
 # ---------- EQUIPOS ----------
 @admin.register(Equipo)
@@ -11,6 +12,7 @@ class EquipoAdmin(admin.ModelAdmin):
         "id", "nombre",
         "division_nombre", "area_nombre", "zona_nombre",
         "owner_nombre", "categoria_nombre", "ubicacion_descripcion",
+        "sap_tplnr",
     )
     list_filter = (
         ("division", admin.RelatedOnlyFieldListFilter),
@@ -24,10 +26,42 @@ class EquipoAdmin(admin.ModelAdmin):
         "division__nombre", "area__nombre", "zona__nombre",
         "owner__nombre", "categoria__nombre",
         "ubicacion__descripcion",
+        "sap_equnr", "sap_tplnr",
     )
     list_select_related = ("division", "area", "zona", "owner", "categoria", "ubicacion")
     ordering = ("division__nombre", "area__nombre", "zona__nombre", "nombre")
     autocomplete_fields = ("division", "area", "zona", "owner", "categoria", "ubicacion")
+
+    class Media:
+        js = ("inspeccion/admin_sap_search.js",)
+
+    def save_model(self, request, obj, form, change):
+        """Auto-asigna datos SAP según el nombre si los campos están vacíos."""
+        auto = None
+        sin_datos = not obj.sap_equnr and not obj.sap_tplnr
+        if sin_datos and obj.nombre:
+            try:
+                auto = sap_assets.auto_match(obj.nombre)
+            except Exception:
+                auto = None  # la API nunca debe impedir guardar
+            if auto:
+                obj.sap_equnr = auto['equnr']
+                obj.sap_equnr_desc = auto['equnr_desc']
+                obj.sap_tplnr = auto['tplnr']
+                obj.sap_tplnr_desc = auto['tplnr_desc']
+        super().save_model(request, obj, form, change)
+        if auto:
+            destino = auto['tplnr'] or auto['equnr']
+            messages.success(
+                request,
+                f'Ubicación técnica asignada automáticamente desde SAP: {destino}'
+            )
+        elif sin_datos:
+            messages.warning(
+                request,
+                'No se encontró este equipo en SAP; '
+                'asígnelo manualmente con el buscador "Buscar en SAP".'
+            )
 
     # columnas legibles
     def division_nombre(self, obj): return getattr(obj.division, "nombre", "")

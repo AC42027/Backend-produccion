@@ -68,6 +68,12 @@ class Equipo(models.Model):
     zona = models.ForeignKey(Zona, on_delete=models.SET_NULL, null=True, blank=True)
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='equipos')
 
+    # CAMPOS SAP - mapeo del equipo contra el maestro de activos SAP
+    sap_equnr = models.CharField(max_length=50, blank=True, null=True, verbose_name="Código Equipo SAP (EQUNR)")
+    sap_equnr_desc = models.CharField(max_length=150, blank=True, null=True, verbose_name="Descripción Equipo SAP")
+    sap_tplnr = models.CharField(max_length=50, blank=True, null=True, verbose_name="Ubicación Técnica SAP (TPLNR)")
+    sap_tplnr_desc = models.CharField(max_length=150, blank=True, null=True, verbose_name="Descripción Ubicación Técnica SAP")
+
     def __str__(self):
         return self.nombre
 

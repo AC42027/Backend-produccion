@@ -10,7 +10,7 @@ __pycache__/
 # Archivos generados
 *.log
 *.sqlite3
-static/
+/static/
 *.db
 *.whl
 dash.json

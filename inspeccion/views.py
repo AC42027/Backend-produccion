@@ -18,6 +18,8 @@ from .models import (
 from .serializers import AsignacionInspeccionSerializer, EquipoSinQRSerializer
 from .authentication import EquipoSinQRAuthentication
 from .sap_connector import crear_notificacion_sap, cerrar_notificacion_sap
+from . import sap_assets
+from .sap_assets import SapAssetsError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -241,7 +243,11 @@ def listar_equipos(request):
             'area_id': e.area.id if e.area else None,
             'division': e.division.nombre if e.division else '',
             'division_id': e.division.id if e.division else None,
-            'owner': e.owner.nombre if e.owner else ''
+            'owner': e.owner.nombre if e.owner else '',
+            'sap_equnr': e.sap_equnr or '',
+            'sap_equnr_desc': e.sap_equnr_desc or '',
+            'sap_tplnr': e.sap_tplnr or '',
+            'sap_tplnr_desc': e.sap_tplnr_desc or ''
         }
         for e in equipos
     ]
@@ -263,7 +269,67 @@ def obtener_equipo(request, equipo_id):
         'zona': equipo.zona.nombre if equipo.zona else '',
         'area': equipo.area.nombre if equipo.area else '',
         'division': equipo.division.nombre if equipo.division else '',
-        'owner': equipo.owner.nombre if equipo.owner else ''
+        'owner': equipo.owner.nombre if equipo.owner else '',
+        'sap_equnr': equipo.sap_equnr or '',
+        'sap_equnr_desc': equipo.sap_equnr_desc or '',
+        'sap_tplnr': equipo.sap_tplnr or '',
+        'sap_tplnr_desc': equipo.sap_tplnr_desc or ''
+    })
+
+
+# ── SAP Assets: búsqueda y resolución de equipos contra la API de activos ──────
+
+def sap_buscar_activos(request):
+    """
+    GET /api/sap/buscar/?q=<texto>
+    Proxy de búsqueda de activos SAP (equipos EQ y ubicaciones técnicas FL).
+    Retorna: {'resultados': [{id, descript, type}]}
+    """
+    query = (request.GET.get('q') or '').strip()
+    if len(query) < 2:
+        return JsonResponse(
+            {'error': 'Ingrese al menos 2 caracteres de búsqueda'},
+            status=400
+        )
+    try:
+        resultados = sap_assets.buscar_activos(query)
+    except SapAssetsError as e:
+        logger.error(f"[SAP Assets] Error en búsqueda '{query}': {e}")
+        return JsonResponse({'error': str(e)}, status=502)
+    return JsonResponse({'query': query, 'resultados': resultados})
+
+
+def sap_resolver_equipo(request):
+    """
+    GET /api/sap/resolver/?equnr=<código>
+    Resuelve un equipo SAP a su ubicación técnica.
+    Retorna: {'equnr', 'equnr_desc', 'tplnr', 'tplnr_desc'}
+    """
+    equnr = (request.GET.get('equnr') or '').strip()
+    if not equnr:
+        return JsonResponse({'error': 'Parámetro equnr requerido'}, status=400)
+
+    try:
+        detalle = sap_assets.obtener_equipo(equnr)
+    except SapAssetsError as e:
+        logger.error(f"[SAP Assets] Error resolviendo '{equnr}': {e}")
+        return JsonResponse({'error': str(e)}, status=502)
+
+    tplnr = (detalle.get('parent') or '').strip()
+    tplnr_desc = ''
+    if tplnr:
+        try:
+            loc = sap_assets.obtener_ubicacion(tplnr)
+            tplnr_desc = loc.get('descripcion', '') or ''
+        except SapAssetsError as e:
+            # Degradación graciosa: sin descripción de TPLNR seguimos igual
+            logger.warning(f"[SAP Assets] Sin descripción para TPLNR {tplnr}: {e}")
+
+    return JsonResponse({
+        'equnr': detalle.get('equnr', '') or '',
+        'equnr_desc': detalle.get('descripcion', '') or '',
+        'tplnr': tplnr,
+        'tplnr_desc': tplnr_desc,
     })
 
 

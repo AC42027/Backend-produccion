@@ -59,7 +59,13 @@ class Command(BaseCommand):
             actualizados += self._importar_json(json_path, dry_run)
 
         # ── Fase 2: auto-match de equipos sin datos SAP ─────────────────
-        restantes = Equipo.objects.filter(Q(sap_equnr__isnull=True) | Q(sap_equnr=''))
+        # Solo equipos sin NINGUN dato SAP: si el JSON ya asigno un TPLNR,
+        # el auto-match no debe pisarlo (ej. maquinas completas tipo Plummer/
+        # Crane cuyo mapa no define EQUNR).
+        restantes = Equipo.objects.filter(
+            Q(sap_equnr__isnull=True) | Q(sap_equnr=''),
+            Q(sap_tplnr__isnull=True) | Q(sap_tplnr='')
+        )
         total_restantes = restantes.count()
         if total_restantes:
             self.stdout.write(self.style.MIGRATE_HEADING(

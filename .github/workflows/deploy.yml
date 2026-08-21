@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry-run (no escribe en la BD)'
+        type: boolean
+        default: false
+      skip_json:
+        description: 'Omitir JSON del frontend (solo auto-match API)'
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -33,3 +43,16 @@ jobs:
       - name: Restart Backend Service
         run: |
           sudo systemctl restart inspecciones.service
+
+      - name: Backfill SAP (solo manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          cd /var/www/html/insp_pry/Backend-produccion
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          if [ "${{ inputs.skip_json }}" = "true" ]; then
+            ./venv/bin/python manage.py backfill_sap --skip-json $ARGS
+          else
+            curl -fsSL -o /tmp/django_to_sap_map.json https://raw.githubusercontent.com/AC42027/Frontend-formulario-produccion/main/falcon/django_to_sap_map.json
+            ./venv/bin/python manage.py backfill_sap --json /tmp/django_to_sap_map.json $ARGS
+          fi

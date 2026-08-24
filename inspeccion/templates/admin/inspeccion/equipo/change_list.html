@@ -1,0 +1,14 @@
+{% extends "admin/import_export/change_list.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+  {% if perms.inspeccion.add_equipo %}
+    <li>
+      <a href="{% url 'admin:inspeccion_equipo_plantilla' %}"
+         title="Plantilla .xlsx con listas desplegables desde la base de datos">
+        {% translate "Descargar plantilla" %}
+      </a>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

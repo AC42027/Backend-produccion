@@ -93,7 +93,11 @@ class EquipoResource(resources.ModelResource):
 @admin.register(Equipo)
 class EquipoAdmin(ImportExportModelAdmin):
     resource_classes = [EquipoResource]
-    change_list_template = "admin/inspeccion/equipo/change_list.html"
+    # v4 + jazzmin: esta plantilla reemplaza a change_list_import_export.html
+    # y agrega el botón de plantilla junto a Importar/Exportar.
+    import_export_change_list_template = (
+        "admin/inspeccion/equipo/change_list.html"
+    )
     list_display = (
         "id", "nombre",
         "division_nombre", "area_nombre", "zona_nombre",

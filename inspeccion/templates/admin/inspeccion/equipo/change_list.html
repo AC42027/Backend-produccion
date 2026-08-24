@@ -1,14 +1,19 @@
 {% extends "admin/import_export/change_list.html" %}
-{% load i18n %}
+{% load i18n admin_urls jazzmin %}
+
+{% get_jazzmin_ui_tweaks as jazzmin_ui %}
 
 {% block object-tools-items %}
-  {% if perms.inspeccion.add_equipo %}
-    <li>
+  <div class="btn-group float-end">
+    {% include "admin/import_export/change_list_import_item.html" %}
+    {% include "admin/import_export/change_list_export_item.html" %}
+    {% if perms.inspeccion.add_equipo %}
       <a href="{% url 'admin:inspeccion_equipo_plantilla' %}"
-         title="Plantilla .xlsx con listas desplegables desde la base de datos">
-        {% translate "Descargar plantilla" %}
+         class="btn {{ jazzmin_ui.button_classes.secondary }}"
+         title="{% translate 'Plantilla .xlsx con listas desplegables desde la base de datos' %}">
+        <i class="fas fa-download"></i> {% translate "Descargar plantilla" %}
       </a>
-    </li>
-  {% endif %}
-  {{ block.super }}
+    {% endif %}
+    {{ block.super }}
+  </div>
 {% endblock %}

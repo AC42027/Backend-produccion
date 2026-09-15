@@ -276,7 +276,17 @@ class Command(BaseCommand):
         import urllib.error
 
         payload = json.dumps(card).encode('utf-8')
-        url = f"{base_url}?etiqueta={etiqueta}"
+
+        # La URL del webhook YA incluye ?api-version=1&sp=..&sv=1.0&sig=...
+        # por lo que añadir etiqueta debe ir con '&' (nunca '?', rompe el sig).
+        import urllib.parse
+        p = urllib.parse.urlsplit(base_url)
+        qs = dict(urllib.parse.parse_qsl(p.query))
+        qs['etiqueta'] = etiqueta
+        url = urllib.parse.urlunsplit(
+            (p.scheme, p.netloc, p.path,
+             urllib.parse.urlencode(qs), p.fragment))
+
         req = urllib.request.Request(
             url, data=payload, method='POST',
             headers={'Content-Type': 'application/json; charset=utf-8'})

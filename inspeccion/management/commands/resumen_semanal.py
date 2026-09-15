@@ -32,7 +32,7 @@ Uso:
 import datetime as dt
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from inspeccion.models import (
     AsignacionInspeccion, EquipoSinQR, Inspeccion, InspeccionTecnico,
@@ -106,10 +106,9 @@ class Command(BaseCommand):
             if s + dt.timedelta(days=7) <= hoy:
                 referencia = s
         if referencia is None:
-            self.stdout.write(self.style.ERROR(
+            raise CommandError(
                 'No hay una semana de asignación completamente terminada '
-                'aún. Genera asignaciones primero.'))
-            return 1
+                'aún. Genera asignaciones primero.')
         inicio = referencia
         fin = referencia + dt.timedelta(days=6)
 
@@ -296,11 +295,8 @@ class Command(BaseCommand):
                     f"Resumen enviado a Teams (semana {inicio:%d/%m}) · "
                     f"HTTP {resp.status}"))
         except urllib.error.HTTPError as e:
-            self.stderr.write(self.style.ERROR(
-                f"Teams HTTP {e.code}: {e.read().decode('utf-8', 'replace')}"))
-            return 1
+            raise CommandError(
+                f"Teams HTTP {e.code}: {e.read().decode('utf-8', 'replace')}")
         except urllib.error.URLError as e:
-            self.stderr.write(self.style.ERROR(
-                f"No se pudo contactar el webhook: {e.reason}"))
-            return 1
-        return 0
+            raise CommandError(
+                f"No se pudo contactar el webhook: {e.reason}")

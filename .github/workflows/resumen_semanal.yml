@@ -1,0 +1,19 @@
+name: Resumen Semanal Inspecciones
+on:
+  schedule:
+    # Se ejecuta cada lunes a las 08:00 hora de Chile:
+    # GMT-4 (horario normal) = 12:00 UTC.
+    # Nota: durante el horario DST (~mar-sep) se envía a las 09:00 local.
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+jobs:
+  resumen-semanal:
+    runs-on: self-hosted
+    env:
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+    steps:
+      - name: Enviar resumen semanal a Teams
+        run: |
+          cd /var/www/html/insp_pry/Backend-produccion
+          ./venv/bin/python manage.py resumen_semanal

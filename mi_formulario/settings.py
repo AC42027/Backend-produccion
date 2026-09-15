@@ -146,6 +146,10 @@ EXEMPT_IP_RESTRICTION_PATHS = [
 # Token de API compartido para los endpoints de "Equipos sin QR"
 EQUIPO_SIN_QR_API_TOKEN = config('EQUIPO_SIN_QR_API_TOKEN', default='fxoNqZPOR7nxwAYrbqFTONNEjUO2I1Hv3Wm34YGrEL4')
 
+# Webhook de Microsoft Teams usado por el comando `resumen_semanal`
+# Definir en el .env del servidor: TEAMS_WEBHOOK_URL=https://...
+TEAMS_WEBHOOK_URL = config('TEAMS_WEBHOOK_URL', default='')
+
 # Jazzmin settings
 JAZZMIN_SETTINGS = {
     "site_title": "Goodyear Admin",

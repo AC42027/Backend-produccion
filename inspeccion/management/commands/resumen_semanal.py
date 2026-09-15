@@ -151,43 +151,8 @@ class Command(BaseCommand):
             z = i.zona.nombre if i.zona else 'Sin zona'
             zonas.setdefault(z, []).append(i)
 
-        # ── 7. Tarjeta ───────────────────────────────────────────────────
-        pend_top = 'Sin pendientes 🎉'
-        if pendientes:
-            pend_top = '\n'.join(
-                f"• {a.equipo}" + (f" ({a.zona})" if a.zona else "")
-                for a in pendientes[:8]
-            )
-            if len(pendientes) > 8:
-                pend_top += f"\n… y {len(pendientes) - 8} más"
-
-        crit_top = 'Sin hallazgos críticos ✅'
-        if criticos:
-            crit_top = '\n'.join(
-                f"• {r.inspeccion.equipo.nombre}: {r.descripcion[:45]}"
-                for r in criticos[:8]
-            )
-            if len(criticos) > 8:
-                crit_top += f"\n… y {len(criticos) - 8} más"
-
-        qr_top = 'Todo con QR'
-        if sin_qr:
-            qr_top = '\n'.join(f"• {q.equipo_nombre}" for q in sin_qr)
-            if len(sin_qr) > 8:
-                qr_top += f"\n… y más"
-
+        # ── 7. Tarjeta: resumen ejecutivo (solo cifras) ─────────────────
         base_url = settings.TEAMS_WEBHOOK_URL or ''
-
-        zona_blocks = []
-        for z in sorted(zonas.keys()):
-            zona_blocks += [
-                {"type": "TextBlock", "text": f"🏭 {z}", "weight": "Bolder",
-                 "size": "Small", "spacing": "Medium", "wrap": True},
-                {"type": "TextBlock",
-                 "text": str(len(zonas[z])) + " inspección(es)",
-                 "size": "Small", "isSubtle": True, "spacing": "None",
-                 "wrap": True},
-            ]
 
         card = {
             "type": "AdaptiveCard",
@@ -229,43 +194,12 @@ class Command(BaseCommand):
             ],
         }
 
-        # ⚠️ Columna de progreso: sin FillMaxMode para evitar incompatibilidad
-        progerlo = self._progress('% Cumplimiento', realizadas,
-                                  realizadas + len(pendientes), 'Good')
-        card["body"] += [
+        # 🔗 Acción única: abrir el dashboard (resumen ejecutivo sin detalle)
+        card["actions"] = [
             {
-                "type": "Container",
-                "spacing": "None",
-                "items": [{"type": "TextBlock", "text": "🛠 ACCIONES PENDIENTES",
-                           "weight": "Bolder", "spacing": "Medium",
-                           "wrap": True}],
-            },
-            {"type": "TextBlock", "text": pend_top, "wrap": True,
-             "spacing": "Small", "height": "stretch"},
-            {
-                "type": "Container", "spacing": "Medium",
-                "items": [
-                    {"type": "TextBlock", "text": "🔴 HALLAZGOS CRÍTICOS",
-                     "weight": "Bolder", "color": "Attention", "wrap": True},
-                    {"type": "TextBlock", "text": crit_top, "wrap": True,
-                     "spacing": "None", "height": "stretch"},
-                ],
-            },
-            {
-                "type": "Container", "spacing": "Medium",
-                "items": [
-                    {"type": "TextBlock", "text": "📍 EQUIPOS SIN QR",
-                     "weight": "Bolder", "color": "Attention", "wrap": True},
-                    {"type": "TextBlock", "text": qr_top, "wrap": True,
-                     "spacing": "None", "height": "stretch"},
-                ],
-            },
-            {
-                "type": "Container", "spacing": "Medium",
-                "items": [
-                    {"type": "TextBlock", "text": "🗺️ INSPECCIONES POR ZONA",
-                     "weight": "Bolder", "color": "Accent", "wrap": True},
-                ] + zona_blocks,
+                "type": "Action.OpenUrl",
+                "title": "🔗 Ver Dashboard",
+                "url": "http://10.107.194.110/insp_pry/dashboard/",
             },
         ]
 

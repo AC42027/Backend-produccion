@@ -319,6 +319,112 @@ def crear_notificacion_sap(inspeccion):
         logger.error(f"[SAP Puente] {error_msg}")
         return {'status': 'error', 'nr_numero': '', 'mensaje': error_msg}
 
+# ── Portal SAP PM (10.107.194.110:5000): consulta de estado de avisos ─────────
+#
+# El portal SAP PM ya implementa login GoPass (LDAP) -> SAP L1P/L3C y permite
+# consultar avisos (IW29). En lugar de SOAP directo (bloqueado por ICF), usamos
+# este portal como gateway: el backend recibe las credenciales LDAP del usuario
+# desde el frontend, loguea en el portal y consulta el estado de cada aviso.
+
+PORTAL_SAP_BASE = config('PORTAL_SAP_BASE', default='http://10.107.194.110:5000')
+
+# Cache de cookies de sesión del portal por usuario: {(user, target): cookie}
+_portal_session_cache = {}
+
+
+def _portal_login(username, password, target='L1P'):
+    """Loguea en el portal SAP PM y devuelve la cookie de sesión."""
+    key = (username.upper(), target.upper())
+    cookie = _portal_session_cache.get(key)
+    if cookie:
+        return cookie
+
+    url = f"{PORTAL_SAP_BASE}/api/auth/login"
+    payload = {
+        'username': username,
+        'password': password,
+        'sap_target': target,
+    }
+    resp = requests.post(url, json=payload, timeout=30)
+    if resp.status_code != 200:
+        raise SapPortalError(
+            f"Login al portal SAP falló (HTTP {resp.status_code})"
+        )
+    cookie = resp.cookies.get('session', '')
+    if not cookie:
+        raise SapPortalError("El portal SAP no entregó cookie de sesión")
+    _portal_session_cache[key] = cookie
+    return cookie
+
+
+def consultar_status_avisos(numeros, username, password, target='L1P'):
+    """
+    Consulta el estado de uno o varios avisos (notificaciones) contra el
+    portal SAP PM. Devuelve un dict {aviso: {'status','order','description'}}.
+    """
+    if not numeros:
+        return {}
+
+    cookie = _portal_login(username, password, target)
+    num_param = ','.join(str(n).strip() for n in numeros if str(n).strip())
+
+    url = f"{PORTAL_SAP_BASE}/api/notifications"
+    resp = requests.get(
+        url,
+        params={'notif_numbers': num_param},
+        cookies={'session': cookie},
+        timeout=45,
+    )
+
+    # Re-login una sola vez si la sesión venció (401)
+    if resp.status_code == 401:
+        _portal_session_cache.clear()
+        cookie = _portal_login(username, password, target)
+        resp = requests.get(
+            url,
+            params={'notif_numbers': num_param},
+            cookies={'session': cookie},
+            timeout=45,
+        )
+
+    if resp.status_code != 200:
+        raise SapPortalError(
+            f"Consulta al portal SAP falló (HTTP {resp.status_code})"
+        )
+
+    try:
+        data = resp.json().get('data') or []
+    except ValueError:
+        raise SapPortalError("Respuesta del portal SAP no fue JSON válido")
+
+    resultado = {}
+    for item in data:
+        aviso = (item.get('id') or item.get('number') or '').strip()
+        if not aviso:
+            continue
+        resultado[aviso] = {
+            'status': item.get('status') or '',
+            'order': item.get('order') or '',
+            'description': item.get('description') or '',
+            'equipment': item.get('equipment') or '',
+        }
+    return resultado
+
+
+def limpiar_portal_cache(username=None):
+    """Invalida la cache del portal (todos o solo la cuenta indicada)."""
+    if username is None:
+        _portal_session_cache.clear()
+        return
+    username = username.upper()
+    for key in [k for k in _portal_session_cache if k[0] == username]:
+        _portal_session_cache.pop(key, None)
+
+
+class SapPortalError(Exception):
+    pass
+
+
 def cerrar_notificacion_sap(inspeccion):
     """
     Llama al JSP 'cerrar_notificacion.jsp' para cerrar un aviso en SAP.

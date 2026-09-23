@@ -17,7 +17,10 @@ from .models import (
 )
 from .serializers import AsignacionInspeccionSerializer, EquipoSinQRSerializer
 from .authentication import EquipoSinQRAuthentication
-from .sap_connector import crear_notificacion_sap, cerrar_notificacion_sap
+from .sap_connector import (
+    crear_notificacion_sap, cerrar_notificacion_sap,
+    consultar_status_avisos, SapPortalError,
+)
 from . import sap_assets
 from .sap_assets import SapAssetsError
 from rest_framework.views import APIView
@@ -73,7 +76,66 @@ def login_ldap(request):
 @csrf_exempt
 def logout_view(request):
     logout(request)
+    # Invalidar caches de sesión del portal (por seguridad, al cerrar sesión)
+    try:
+        from .sap_connector import limpiar_portal_cache
+        limpiar_portal_cache()
+    except Exception:
+        pass
     return JsonResponse({'status': 'ok', 'message': 'Sesión cerrada'})
+
+
+@csrf_exempt
+def consultar_avisos_status(request):
+    """
+    POST /api/sap/avisos/status/
+    Body: {"avisos": ["2001321604", ...], "username": "ac17157", "password": "..."}
+
+    Consulta el estado (Abierto/En proceso/Cerrado) de avisos SAP PM en el
+    portal 10.107.194.110:5000 usando las credenciales LDAP del usuario.
+    La autenticación la realiza el propio portal (GoPass/LDAP + SAP L1P).
+    """
+    if request.method == 'OPTIONS':
+        return JsonResponse({'status': 'ok'})
+
+    if request.method != 'POST':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método no permitido. Se requiere POST.'},
+            status=405,
+        )
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Formato JSON inválido'}, status=400)
+
+    avisos = data.get('avisos') or []
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+    sap_target = (data.get('sap_target') or 'L1P').strip().upper()
+
+    if not avisos:
+        return JsonResponse({'status': 'error', 'message': 'Parámetro "avisos" requerido'}, status=400)
+    if not username or not password:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Credenciales LDAP requeridas para consultar SAP.'},
+            status=400,
+        )
+
+    # Normalizar: aceptar lista o string separado por comas
+    if isinstance(avisos, str):
+        avisos = [a.strip() for a in avisos.split(',') if a.strip()]
+
+    try:
+        resultado = consultar_status_avisos(avisos, username, password, sap_target)
+    except SapPortalError as e:
+        logger.error(f"[SAP Portal] Error consultando avisos {avisos}: {e}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=502)
+    except Exception as e:
+        logger.exception(f"[SAP Portal] Error inesperado consultando avisos {avisos}")
+        return JsonResponse({'status': 'error', 'message': f'Error inesperado: {str(e)}'}, status=500)
+
+    return JsonResponse({'status': 'ok', 'avisos': resultado})
 
 
 @csrf_exempt

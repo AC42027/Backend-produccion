@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/inspecciones/<int:inspeccion_id>/cerrar/', views.cerrar_inspeccion_sap, name='cerrar_inspeccion_sap'),
     path('api/login-ldap/', views.login_ldap, name='login_ldap'),
     path('api/logout/', views.logout_view, name='logout_view'),
+    path('api/sap/avisos/status/', views.consultar_avisos_status, name='avisos_status'),
     path('api/equipo/', EquipoPlanificacionView.as_view(), name='equipo_api'),
     # Nuevos endpoints para "Equipos sin QR"
     path('api/equipos-sin-qr/', EquipoSinQRList.as_view(), name='equipos_sin_qr_list'),

@@ -25,31 +25,6 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-      - name: Replicar config SAP L1P desde el portal (.env)
-        run: |
-          BE=/var/www/html/insp_pry/Backend-produccion/.env
-          PE=/var/www/html/ingenieria/portal_sap/.env
-          if [ ! -f "$PE" ]; then
-            echo "AVISO: no existe .env del portal ($PE); saltando"
-            exit 0
-          fi
-          get_kv() { local f=$1 k=$2; awk -F= -v k="$k" '$1==k {gsub(/^"|"$/, "", $2); print $2; exit}' "$f"; }
-          for pair in "SAP_L1P_HOST|SAP_HOST" "SAP_L1P_SYSNR|SAP_SYSNR" "SAP_L1P_CLIENT|SAP_CLIENT" "SAP_L1P_LANG|SAP_LANG"; do
-            key=${pair%%|*}; gen=${pair##*|}
-            val=$(get_kv "$PE" "$key")
-            if [ -z "$val" ]; then val=$(get_kv "$PE" "$gen"); fi
-            if [ -z "$val" ]; then
-              echo "AVISO: $key sin valor en el portal"
-              continue
-            fi
-            if grep -q "^${key}=" "$BE" 2>/dev/null; then
-              echo "OK (ya existe): $key"
-            else
-              echo "${key}=${val}" >> "$BE"
-              echo "OK (agregada): $key=${val}"
-            fi
-          done
-
       - name: Install dependencies
         run: |
           cd /var/www/html/insp_pry/Backend-produccion

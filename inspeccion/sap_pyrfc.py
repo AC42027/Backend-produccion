@@ -15,6 +15,7 @@ se reporta abierto. Auth: user/pass LDAP del request.
 """
 
 import os
+import time
 import ctypes
 import logging
 import threading
@@ -25,6 +26,12 @@ logger = logging.getLogger(__name__)
 # pyRFC NO es thread-safe: un lock global serializa las llamadas dentro del
 # proceso.
 _rfc_lock = threading.Lock()
+
+# Caché en memoria (TTL) del estado de avisos consultados. pyRFC es lento
+# (~1s por aviso), pero el dashboard consulta los mismos avisos repetidamente.
+# TTL configurable via SAP_AVISO_CACHE_TTL (segundos).
+_cache_avisos = {}          # aviso -> (timestamp, entry)
+_cache_ttl = config('SAP_AVISO_CACHE_TTL', default=600, cast=int)
 
 AVISO_TARGETS_SOPORTADOS = ['L1P']
 
@@ -150,9 +157,36 @@ def _rutina_read_table(conn, query_table, fields, options):
     return filas
 
 
+def _chunk_in(clausula, valores, sufijo='', max_len=60):
+    """
+    Parte una lista de valores en subclausulas IN(...) que quepan en una
+    línea TEXT de RFC_READ_TABLE. El límite seguro es ~60 chars porque
+    OPTIONS.TEXT acepta hasta 72 caracteres.
+    """
+    def _texto(valores_grupo):
+        literales = ', '.join("'" + v + "'" for v in valores_grupo)
+        return clausula + " IN (" + literales + ")" + sufijo
+
+    grupos = []
+    grupo = []
+    for val in valores:
+        grupo.append(val)
+        if len(_texto(grupo)) > max_len:
+            grupo.pop()
+            if grupo:
+                grupos.append(_texto(grupo))
+            grupo = [val]
+    if grupo:
+        grupos.append(_texto(grupo))
+    return grupos
+
+
 def consultar_status_avisos_directo(numeros, username, password, target='L1P'):
     """
-    Consulta el estado de uno o varios avisos directamente en SAP vía pyRFC.
+    Consulta el estado de varios avisos directamente en SAP vía pyRFC.
+
+    Batching: consulta QMEL con QMNUM IN(...) y JEST con OBJNR IN(...) en
+    pocas llamadas RFC (en vez de 2 llamadas por aviso).
 
     Devuelve dict {aviso: {'status','order','description','equipment'}}.
       - status: 'Cerrado' (MEAB en JEST) | 'Abierto' | '' si no se encuentra.
@@ -170,55 +204,92 @@ def consultar_status_avisos_directo(numeros, username, password, target='L1P'):
     conn = None
     with _rfc_lock:
         try:
+            ahora = time.time()
+
+            # ── 0) Separar avisos en caché (TTL vigente) ─────────────────────
+            pendientes = []
+            for aviso in avisos:
+                hit = _cache_avisos.get(aviso)
+                if hit and (ahora - hit[0]) < _cache_ttl:
+                    resultado[aviso] = hit[1]
+                else:
+                    pendientes.append(aviso)
+            if not pendientes:
+                return resultado
+
             conn = _conexion(username, password, target)
             logger.info(
-                f"[SAP pyrfc] Conectado directo a SAP ({target}) - consultando {len(avisos)} avisos"
+                f"[SAP pyrfc] Conectado directo a SAP ({target}) - "
+                f"consultando {len(pendientes)} avisos (nuevos)"
             )
-            for aviso in avisos:
+
+            # ── 1) QMEL en lote: QMNUM → (OBJNR, QMTXT, AUFNR) ──────────────
+            qmnums = [a.zfill(12) for a in pendientes]
+            qmel_rows = []
+            for cond in _chunk_in('QMNUM', qmnums):
+                qmel_rows += _rutina_read_table(
+                    conn,
+                    'QMEL',
+                    ['QMNUM', 'OBJNR', 'QMTXT', 'AUFNR'],
+                    [cond],
+                )
+
+            datos_qmel = {}   # QMNUM(12) -> dict
+            objnrs = set()
+            for qmel in qmel_rows:
+                wa = qmel.split('|')
+                qmnum = wa[0].strip() if len(wa) > 0 else ''
+                objnr = wa[1].strip() if len(wa) > 1 else ''
+                desc  = wa[2].strip() if len(wa) > 2 else ''
+                aufnr = wa[3].strip() if len(wa) > 3 else ''
+                datos_qmel[qmnum] = {
+                    'objnr': objnr,
+                    'description': desc,
+                    'order': aufnr,
+                }
+                if objnr:
+                    objnrs.add(objnr)
+
+            # ── 2) JEST en lote: OBJNR → {STAT} ──────────────────────────────
+            stats_por_objnr = {}
+            for cond in _chunk_in('OBJNR', sorted(objnrs)):
+                jest_rows = _rutina_read_table(
+                    conn,
+                    'JEST',
+                    ['OBJNR', 'STAT', 'INACT'],
+                    [cond],
+                )
+                for fila in jest_rows:
+                    wa = fila.split('|')
+                    objnr = wa[0].strip() if len(wa) > 0 else ''
+                    stat  = wa[1].strip() if len(wa) > 1 else ''
+                    inact = wa[2].strip() if len(wa) > 2 else ''
+                    if objnr and inact == '':
+                        stats_por_objnr.setdefault(objnr, set()).add(stat)
+
+            # ── 3) Armar resultado ───────────────────────────────────────────
+            for aviso in pendientes:
                 qmnum = aviso.zfill(12)
-                try:
-                    qmel_rows = _rutina_read_table(
-                        conn,
-                        'QMEL',
-                        ['OBJNR', 'QMTXT', 'AUFNR'],
-                        [f"QMNUM = '{qmnum}'"],
-                    )
-                    if not qmel_rows:
-                        logger.debug(f"[SAP pyrfc] Aviso {aviso} no encontrado en QMEL")
-                        resultado[aviso] = {
-                            'status': '', 'order': '', 'description': '', 'equipment': '',
-                        }
-                        continue
-
-                    wa = qmel_rows[0]
-                    parts = wa.split('|')
-                    objnr = parts[0].strip() if len(parts) > 0 else ''
-                    desc  = parts[1].strip() if len(parts) > 1 else ''
-                    aufnr = parts[2].strip() if len(parts) > 2 else ''
-
-                    status = 'Abierto'
-                    if objnr:
-                        jest_rows = _rutina_read_table(
-                            conn,
-                            'JEST',
-                            ['STAT'],
-                            [f"OBJNR = '{objnr}' AND INACT = ''"],
-                        )
-                        stats = [r for r in jest_rows if r]
-                        if 'MEAB' in stats:
-                            status = 'Cerrado'
-
-                    resultado[aviso] = {
-                        'status': status,
-                        'order': aufnr,
-                        'description': desc,
-                        'equipment': '',
-                    }
-                except Exception as e:
-                    logger.warning(f"[SAP pyrfc] Error consultando aviso {aviso}: {e}")
+                dato = datos_qmel.get(qmnum)
+                if not dato:
                     resultado[aviso] = {
                         'status': '', 'order': '', 'description': '', 'equipment': '',
                     }
+                    continue
+                stats = stats_por_objnr.get(dato['objnr'], set())
+                status = 'Cerrado' if 'MEAB' in stats else 'Abierto'
+                resultado[aviso] = {
+                    'status': status,
+                    'order': dato['order'],
+                    'description': dato['description'],
+                    'equipment': '',
+                }
+
+            # Llenar caché con los recién consultados
+            t = time.time()
+            for aviso in pendientes:
+                _cache_avisos[aviso] = (t, resultado[aviso])
+
         except SapRfcError:
             raise
         except Exception as e:

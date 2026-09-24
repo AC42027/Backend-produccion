@@ -89,13 +89,23 @@ jobs:
           import django; django.setup()
           from decouple import config
           user = config('SAP_USER', default='ac17157')
-          pwd  = config('SAP_PASS', default='')
+          pwd  = os.environ.get('LDAP_TEST_PASS', '')
           from inspeccion.sap_pyrfc import _conexion, SapRfcError
           print("MODULO OK")
           try:
               conn = _conexion(user, pwd, 'L1P')
               print("CONEXION OK", conn)
-              conn.close()
+              try:
+                  res = conn.call('RFC_READ_TABLE', QUERY_TABLE='QMEL',
+                                  FIELDS=[{'FIELDNAME': 'OBJNR'}, {'FIELDNAME': 'QMTXT'}],
+                                  OPTIONS=[{'TEXT': "QMNUM = '000007601193'"}], DELIMITER='|')
+                  print("CALL OK rows=", len(res.get('DATA') or []))
+                  for row in (res.get('DATA') or [])[:3]:
+                      print("  ROW:", repr(row))
+              except Exception as e:
+                  print("CALL-ERROR:", type(e).__name__, e)
+              finally:
+                  conn.close()
           except SapRfcError as e:
               print("SAPRFC-ERROR:", e)
           except Exception as e:
@@ -103,6 +113,8 @@ jobs:
           PY
           echo "EXIT_CODE=$?"
           set -e
+        env:
+          LDAP_TEST_PASS: ${{ secrets.LDAP_TEST_PASS }}
 
       - name: Backfill SAP (solo manual)
         if: github.event_name == 'workflow_dispatch'

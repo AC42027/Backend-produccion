@@ -75,23 +75,15 @@ jobs:
 
       - name: Configurar env SDK SAP para el servicio
         run: |
-          if [ -d /home/ac42027/nwrfcsdk/lib ]; then
-            SDK=/home/ac42027/nwrfcsdk
-          elif [ -d /usr/local/sap/nwrfcsdk/lib ]; then
-            SDK=/usr/local/sap/nwrfcsdk
-          else
-            echo "ERROR: no se encontró el SDK SAP NW RFC (lib)"; exit 1
-          fi
-          CONF_DIR=/etc/systemd/system/inspecciones.service.d
-          sudo mkdir -p "$CONF_DIR"
-          printf '# Generado por deploy workflow - SDK SAP NW RFC para pyrfc\n' | sudo tee "$CONF_DIR/10-sap-sdk.conf" > /dev/null
-          printf '[Service]\n' | sudo tee -a "$CONF_DIR/10-sap-sdk.conf" > /dev/null
-          printf 'Environment=LD_LIBRARY_PATH=%s/lib\n' "$SDK" | sudo tee -a "$CONF_DIR/10-sap-sdk.conf" > /dev/null
-          printf 'Environment=SAPNWRFC_HOME=%s\n' "$SDK" | sudo tee -a "$CONF_DIR/10-sap-sdk.conf" > /dev/null
-          sudo chmod 644 "$CONF_DIR/10-sap-sdk.conf"
-          sudo systemctl daemon-reload
-          echo "OK: SDK=$SDK drop-in instalado"
-          sudo systemctl cat inspecciones.service 2>&1 | sed -E 's/(LD_LIBRARY_PATH=).*/\1<oculto>/; s/(SAPNWRFC_HOME=).*/\1<oculto>/' || true
+          whoami
+          id -u
+          echo "=== full unit file (sin sudo) ==="
+          systemctl cat inspecciones.service 2>&1 | sed -E 's/(LD_LIBRARY_PATH=).*/\1<oculto>/; s/(SAPNWRFC_HOME=).*/\1<oculto>/' || true
+          echo "=== drop-in dir ==="
+          ls -la /etc/systemd/system/inspecciones.service.d/ 2>&1 || true
+          cat /etc/systemd/system/inspecciones.service.d/10-sap-sdk.conf 2>&1 || true
+          echo "=== sudo -n -l ==="
+          sudo -n -l 2>&1 | grep -iE "systemctl|ALL|NOPASSWD" | head -20 || true
 
       - name: Restart Backend Service
         run: |

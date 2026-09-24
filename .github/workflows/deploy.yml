@@ -75,15 +75,33 @@ jobs:
 
       - name: Configurar env SDK SAP para el servicio
         run: |
-          whoami
-          id -u
-          echo "=== full unit file (sin sudo) ==="
-          systemctl cat inspecciones.service 2>&1 | sed -E 's/(LD_LIBRARY_PATH=).*/\1<oculto>/; s/(SAPNWRFC_HOME=).*/\1<oculto>/' || true
-          echo "=== drop-in dir ==="
-          ls -la /etc/systemd/system/inspecciones.service.d/ 2>&1 || true
-          cat /etc/systemd/system/inspecciones.service.d/10-sap-sdk.conf 2>&1 || true
-          echo "=== sudo -n -l ==="
-          sudo -n -l 2>&1 | grep -iE "systemctl|ALL|NOPASSWD" | head -20 || true
+          cd /var/www/html/insp_pry/Backend-produccion
+          if [ -d /home/ac42027/nwrfcsdk/lib ]; then
+            SDK=/home/ac42027/nwrfcsdk
+          elif [ -d /usr/local/sap/nwrfcsdk/lib ]; then
+            SDK=/usr/local/sap/nwrfcsdk
+          else
+            echo "ERROR: no se encontró el SDK SAP NW RFC (lib)"; exit 1
+          fi
+          BIN=./venv/bin
+          if [ -f "$BIN/uvicorn.bin" ]; then
+            echo "uvicorn.bin ya existe (respaldo previo)"
+          else
+            cp "$BIN/uvicorn" "$BIN/uvicorn.bin"
+            echo "Backup uvicorn -> uvicorn.bin"
+          fi
+          if [ -L "$BIN/uvicorn" ]; then rm "$BIN/uvicorn"; fi
+          cat > "$BIN/uvicorn" <<EOW
+          #!/bin/bash
+          # Wrapper generado por deploy workflow - inyecta el SDK SAP NW RFC
+          export SAPNWRFC_HOME="$SDK"
+          export LD_LIBRARY_PATH="$SDK/lib:\${LD_LIBRARY_PATH:-}"
+          exec "\$BIN/python3.11" -m uvicorn "\$@"
+          EOW
+          chmod +x "$BIN/uvicorn"
+          echo "OK: wrapper uvicorn generado con SDK=$SDK"
+          "$BIN/uvicorn" --version 2>&1 | head -2
+          ls -la "$BIN/uvicorn" "$BIN/uvicorn.bin"
 
       - name: Restart Backend Service
         run: |

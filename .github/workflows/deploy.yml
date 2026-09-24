@@ -118,21 +118,27 @@ jobs:
           echo "=== prueba pyrfc: usuario ac17157 + formatos OPTIONS ==="
           echo "--- import pyrfc SIMULANDO el servicio (sin LD_LIBRARY_PATH) ---"
           env -u LD_LIBRARY_PATH -u SAPNWRFC_HOME ./venv/bin/python - <<'PY' 2>&1
-          import os, ctypes, inspect
+          import os, ctypes, glob
           print("cwd ->", os.getcwd())
+          from decouple import config
+          print("config SAPNWRFC_HOME ->", repr(config('SAPNWRFC_HOME', default='')))
+          print("env  SAPNWRFC_HOME ->", repr(os.environ.get('SAPNWRFC_HOME', '')))
+          for base in ('/home/ac42027/nwrfcsdk', '/usr/local/sap/nwrfcsdk', '/opt/sap/nwrfcsdk'):
+              print(f"candidate {base}: isdir_lib={os.path.isdir(os.path.join(base,'lib'))} libs=", glob.glob(os.path.join(base,'lib','libsapnwrfc*')))
+          # intentar import del sub-modulo nativo para ver el error real
           try:
-              import inspeccion.sap_pyrfc as m
-              print("sap_pyrfc OK; _pyrfc =", m._pyrfc)
-              if m._pyrfc is not None:
-                  print("pyrfc file ->", getattr(m._pyrfc, '__file__', '?'))
-                  print("has Connection ->", hasattr(m._pyrfc, 'Connection'))
-                  try:
-                      c = m._pyrfc.Connection
-                      print("Connection ->", c)
-                  except Exception as e:
-                      print("Connection attr error:", e)
+              import pyrfc._cyrfc as c
+              print("_cyrfc OK ->", c)
+              print("_cyrfc has Connection ->", hasattr(c, 'Connection'))
           except Exception as e:
-              import traceback; traceback.print_exc()
+              print("_cyrfc FAIL ->", type(e).__name__, e)
+          import pyrfc
+          print("pyrfc dir ->", [x for x in dir(pyrfc) if not x.startswith('_')])
+          print("pyrfc file ->", pyrfc.__file__)
+          try:
+              print(open(pyrfc.__file__).read()[:800])
+          except Exception:
+              pass
           PY
           ./venv/bin/python - <<'PY' 2>&1
           import os, sys

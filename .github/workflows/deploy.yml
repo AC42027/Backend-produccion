@@ -84,8 +84,8 @@ jobs:
           export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
           set +e
           echo "=== systemctl cat inspecciones.service ==="
-          sudo systemctl cat inspecciones.service 2>&1 | head -60
-          echo "=== prueba pyrfc (secret vs .env) ==="
+          sudo systemctl cat inspecciones.service 2>&1 | grep -E "ExecStart|Environment|WorkingDirectory|User=" | head -20
+          echo "=== prueba pyrfc (secret [ac17157] vs env [LDA1339]) ==="
           ./venv/bin/python - <<'PY' 2>&1
           import os, sys
           os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mi_formulario.settings')
@@ -94,8 +94,8 @@ jobs:
           from inspeccion.sap_pyrfc import _conexion, SapRfcError
 
           creds = [
-              ("SECRET", config('SAP_USER', default='ac17157'), os.environ.get('LDAP_TEST_PASS', '')),
-              ("ENV",    config('SAP_USER', default='ac17157'), config('SAP_PASS', default='')),
+              ("SECRET-ac17157", 'ac17157', os.environ.get('LDAP_TEST_PASS', '')),
+              ("ENV-LDA1339",    config('SAP_USER', default='ac17157'), config('SAP_PASS', default='')),
           ]
           for label, user, pwd in creds:
               if not pwd:

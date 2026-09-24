@@ -83,42 +83,52 @@ jobs:
           export SAPNWRFC_HOME=/home/ac42027/nwrfcsdk 2>/dev/null || true
           export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
           set +e
-          echo "=== systemctl cat inspecciones.service ==="
-          sudo systemctl cat inspecciones.service 2>&1 | grep -E "ExecStart|Environment|WorkingDirectory|User=" | head -20
-          echo "=== prueba pyrfc (secret [ac17157] vs env [LDA1339]) ==="
+          echo "=== ExecStart (systemctl show) ==="
+          sudo systemctl show inspecciones -p ExecStart 2>&1 | head -5
+          echo "=== prueba pyrfc: usuario ac17157 + formatos OPTIONS ==="
           ./venv/bin/python - <<'PY' 2>&1
           import os, sys
           os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mi_formulario.settings')
           import django; django.setup()
-          from decouple import config
           from inspeccion.sap_pyrfc import _conexion, SapRfcError
 
-          creds = [
-              ("SECRET-ac17157", 'ac17157', os.environ.get('LDAP_TEST_PASS', '')),
-              ("ENV-LDA1339",    config('SAP_USER', default='ac17157'), config('SAP_PASS', default='')),
-          ]
-          for label, user, pwd in creds:
-              if not pwd:
-                  print(f"[{label}] sin password, omito")
-                  continue
-              try:
-                  conn = _conexion(user, pwd, 'L1P')
-                  print(f"[{label}] CONEXION OK ({user})")
+          user = 'ac17157'
+          pwd  = os.environ.get('LDAP_TEST_PASS', '')
+          if not pwd:
+              print("sin password en secret, aborto"); sys.exit(0)
+          try:
+              conn = _conexion(user, pwd, 'L1P')
+              print(f"CONEXION OK ({user})")
+              import pyrfc
+              print("pyrfc:", getattr(pyrfc, '__version__', '?'))
+              def probe(tag, qtable, fields, options, rowcount=None):
                   try:
-                      res = conn.call('RFC_READ_TABLE', QUERY_TABLE='QMEL',
-                                      FIELDS=[{'FIELDNAME': 'OBJNR'}, {'FIELDNAME': 'QMTXT'}],
-                                      OPTIONS=[{'TEXT': "QMNUM = '000007601193'"}], DELIMITER='|')
-                      print(f"[{label}] CALL OK rows=", len(res.get('DATA') or []))
-                      for row in (res.get('DATA') or [])[:3]:
-                          print("   ROW:", repr(row))
+                      kw = dict(QUERY_TABLE=qtable, FIELDS=fields, OPTIONS=options, DELIMITER='|')
+                      if rowcount: kw['ROWCOUNT'] = rowcount
+                      res = conn.call('RFC_READ_TABLE', **kw)
+                      data = res.get('DATA') or []
+                      print(f"  [{tag}] rows={len(data)}")
+                      for row in data[:4]:
+                          print("     ROW:", repr(row))
                   except Exception as e:
-                      print(f"[{label}] CALL-ERROR:", type(e).__name__, e)
-                  finally:
-                      conn.close()
-              except SapRfcError as e:
-                  print(f"[{label}] SAPRFC-ERROR:", e)
-              except Exception as e:
-                  print(f"[{label}] PY-ERROR:", type(e).__name__, e)
+                      print(f"  [{tag}] ERROR:", type(e).__name__, e)
+              # formato TEXT (como JSP)
+              probe("TEXT QMEL 7601193", 'QMEL',
+                    [{'FIELDNAME':'OBJNR'},{'FIELDNAME':'QMTXT'},{'FIELDNAME':'AUFNR'}],
+                    [{'TEXT': "QMNUM = '000007601193'"}])
+              # formato SIGN/OPTION/LOW
+              probe("SIGN QMEL 7601193", 'QMEL',
+                    [{'FIELDNAME':'OBJNR'},{'FIELDNAME':'QMTXT'},{'FIELDNAME':'AUFNR'}],
+                    [{'SIGN':'I','OPTION':'EQ','LOW':'000007601193'}])
+              # sin filtro (permisos?)
+              probe("SIGN QMEL top5", 'QMEL',
+                    [{'FIELDNAME':'QMNUM'},{'FIELDNAME':'QMTXT'}],
+                    [], rowcount=5)
+              conn.close()
+          except SapRfcError as e:
+              print("SAPRFC-ERROR:", e)
+          except Exception as e:
+              print("PY-ERROR:", type(e).__name__, e)
           PY
           echo "EXIT_CODE=$?"
           set -e

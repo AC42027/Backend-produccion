@@ -19,8 +19,8 @@ from .serializers import AsignacionInspeccionSerializer, EquipoSinQRSerializer
 from .authentication import EquipoSinQRAuthentication
 from .sap_connector import (
     crear_notificacion_sap, cerrar_notificacion_sap,
-    consultar_status_avisos, SapPortalError,
 )
+from .sap_pyrfc import consultar_status_avisos_directo, SapRfcError
 from . import sap_assets
 from .sap_assets import SapAssetsError
 from rest_framework.views import APIView
@@ -76,12 +76,6 @@ def login_ldap(request):
 @csrf_exempt
 def logout_view(request):
     logout(request)
-    # Invalidar caches de sesión del portal (por seguridad, al cerrar sesión)
-    try:
-        from .sap_connector import limpiar_portal_cache
-        limpiar_portal_cache()
-    except Exception:
-        pass
     return JsonResponse({'status': 'ok', 'message': 'Sesión cerrada'})
 
 
@@ -91,9 +85,9 @@ def consultar_avisos_status(request):
     POST /api/sap/avisos/status/
     Body: {"avisos": ["2001321604", ...], "username": "ac17157", "password": "..."}
 
-    Consulta el estado (Abierto/En proceso/Cerrado) de avisos SAP PM en el
-    portal 10.107.194.110:5000 usando las credenciales LDAP del usuario.
-    La autenticación la realiza el propio portal (GoPass/LDAP + SAP L1P).
+    Consulta el estado (Abierto/En proceso/Cerrado) de avisos SAP PM de forma
+    DIRECTA a SAP via pyRFC, usando las credenciales LDAP del usuario como
+    user/pass SAP (L1P).
     """
     if request.method == 'OPTIONS':
         return JsonResponse({'status': 'ok'})
@@ -127,12 +121,12 @@ def consultar_avisos_status(request):
         avisos = [a.strip() for a in avisos.split(',') if a.strip()]
 
     try:
-        resultado = consultar_status_avisos(avisos, username, password, sap_target)
-    except SapPortalError as e:
-        logger.error(f"[SAP Portal] Error consultando avisos {avisos}: {e}")
+        resultado = consultar_status_avisos_directo(avisos, username, password, sap_target)
+    except SapRfcError as e:
+        logger.error(f"[SAP RFC] Error consultando avisos {avisos}: {e}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=502)
     except Exception as e:
-        logger.exception(f"[SAP Portal] Error inesperado consultando avisos {avisos}")
+        logger.exception(f"[SAP RFC] Error inesperado consultando avisos {avisos}")
         return JsonResponse({'status': 'error', 'message': f'Error inesperado: {str(e)}'}, status=500)
 
     return JsonResponse({'status': 'ok', 'avisos': resultado})

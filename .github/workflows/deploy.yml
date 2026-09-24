@@ -28,6 +28,14 @@ jobs:
       - name: Install dependencies
         run: |
           cd /var/www/html/insp_pry/Backend-produccion
+          # SDK SAP NW RFC. Necesario para pyrfc.
+          if [ -d /home/ac42027/nwrfcsdk ]; then
+            export SAPNWRFC_HOME=/home/ac42027/nwrfcsdk
+            export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
+          elif [ -d /usr/local/sap/nwrfcsdk ]; then
+            export SAPNWRFC_HOME=/usr/local/sap/nwrfcsdk
+            export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
+          fi
           ./venv/bin/pip install -r requirements.txt
 
       - name: Run Database Migrations

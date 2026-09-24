@@ -6,7 +6,7 @@ Integración directa con SAP PM via pyRFC (SAP NW RFC SDK).
 El backend abre una conexión RFC directa a SAP usando las credenciales LDAP
 del usuario como user/pass SAP.
 
-Misma lógica de consulta que saptest/consultar_notificacion.jsp:
+Lógica de consulta:
     1. QMEL  -> OBJNR del aviso (QMNUM, 12 dígitos).
     2. JEST  -> STAT activos para ese OBJNR (INACT = '').
 

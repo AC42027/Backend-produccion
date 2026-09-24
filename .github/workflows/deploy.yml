@@ -84,7 +84,15 @@ jobs:
           export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
           set +e
           echo "=== ExecStart (systemctl show) ==="
-          sudo systemctl show inspecciones -p ExecStart 2>&1 | head -5
+          sudo systemctl show inspecciones -p ExecStart 2>&1 || true
+          echo "=== ps gunicorn ==="
+          ps aux | grep -i gunicorn | grep -v grep || true
+          echo "=== unit file ==="
+          cat /etc/systemd/system/inspecciones.service 2>/dev/null || sudo cat /etc/systemd/system/inspecciones.service 2>/dev/null || true
+          echo "=== gunicorn.conf ==="
+          cat gunicorn.conf.py 2>/dev/null || true
+          echo "=== journal reciente (crashes) ==="
+          sudo journalctl -u inspecciones -n 40 --no-pager 2>&1 | tail -40 || true
           echo "=== prueba pyrfc: usuario ac17157 + formatos OPTIONS ==="
           ./venv/bin/python - <<'PY' 2>&1
           import os, sys

@@ -93,13 +93,24 @@ def _conexion(username, password, target='L1P'):
             default=config(gen_key, default=default),
         )
 
+    ashost = _cfg('HOST', 'SAP_ASHOST')
+    sysnr = _cfg('SYSNR', 'SAP_SYSNR', '00')
+    client = _cfg('CLIENT', 'SAP_CLIENT', '100')
+    lang = _cfg('LANG', 'SAP_LANG', 'EN')
+
+    if not ashost:
+        raise SapRfcError(
+            f"Falta configurar el host SAP para el target '{target}'. "
+            f"Defina SAP_{target}_HOST (o SAP_ASHOST) en el .env del backend."
+        )
+
     conn = _pyrfc.Connection(
-        ashost=_cfg('HOST', 'SAP_ASHOST'),
-        sysnr=_cfg('SYSNR', 'SAP_SYSNR', '00'),
-        client=_cfg('CLIENT', 'SAP_CLIENT', '100'),
+        ashost=ashost,
+        sysnr=sysnr,
+        client=client,
         user=(username or '').strip().upper(),
         passwd=password or '',
-        lang=_cfg('LANG', 'SAP_LANG', 'EN'),
+        lang=lang,
     )
     return conn
 

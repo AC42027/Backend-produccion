@@ -77,6 +77,33 @@ jobs:
         run: |
           sudo systemctl restart inspecciones.service
 
+      - name: Diagnostico pyRFC (cada deploy, sin secretos en Git)
+        run: |
+          cd /var/www/html/insp_pry/Backend-produccion
+          export SAPNWRFC_HOME=/home/ac42027/nwrfcsdk 2>/dev/null || true
+          export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
+          set +e
+          ./venv/bin/python - <<'PY' 2>&1
+          import os, sys
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mi_formulario.settings')
+          import django; django.setup()
+          from decouple import config
+          user = config('SAP_USER', default='ac17157')
+          pwd  = config('SAP_PASS', default='')
+          from inspeccion.sap_pyrfc import _conexion, SapRfcError
+          print("MODULO OK")
+          try:
+              conn = _conexion(user, pwd, 'L1P')
+              print("CONEXION OK", conn)
+              conn.close()
+          except SapRfcError as e:
+              print("SAPRFC-ERROR:", e)
+          except Exception as e:
+              print("PY-ERROR:", type(e).__name__, e)
+          PY
+          echo "EXIT_CODE=$?"
+          set -e
+
       - name: Backfill SAP (solo manual)
         if: github.event_name == 'workflow_dispatch'
         run: |

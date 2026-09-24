@@ -216,8 +216,15 @@ def crear_notificacion_sap(inspeccion):
         return {'status': 'error', 'nr_numero': '', 'mensaje': 'URL del puente SAP no configurada en .env'}
 
     # Construir parámetros para el JSP exclusivo de inspecciones (BAPI estándar)
-    equipo_nombre = inspeccion.equipo.nombre if inspeccion.equipo else 'EQUIPO'
-    raw_title  = f"Insp. {equipo_nombre} {inspeccion.fecha}"[:40]
+    nok_revisiones = list(inspeccion.revisiones.filter(estado='NOK').order_by('id'))
+    primer_nok = nok_revisiones[0] if nok_revisiones else None
+    titulo_nok = primer_nok.descripcion.strip() if primer_nok else 'NOK'
+    hay_nok_critico = any(revision.es_critico for revision in nok_revisiones)
+    sufijo_critico = ', Critico' if hay_nok_critico else ''
+    prefijo_titulo = 'Insp. '
+    caracteres_disponibles = 40 - len(prefijo_titulo) - len(sufijo_critico)
+    titulo_nok = titulo_nok[:caracteres_disponibles].rstrip()
+    raw_title = f"{prefijo_titulo}{titulo_nok}{sufijo_critico}"
     title = normalizar_para_sap(raw_title)
     userid = (inspeccion.owner or 'SYSTEM').strip().upper()
 
@@ -227,7 +234,6 @@ def crear_notificacion_sap(inspeccion):
         ""  # Salto de línea para dar aire
     ]
     
-    nok_revisiones = inspeccion.revisiones.filter(estado='NOK')
     for idx, rev in enumerate(nok_revisiones, 1):
         linea = f"Item {idx} - {rev.descripcion.strip()}"
         if rev.comentario and rev.comentario.strip():

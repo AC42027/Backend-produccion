@@ -33,12 +33,30 @@ class SapRfcError(Exception):
     pass
 
 
+def _sdk_home():
+    """
+    Resuelve el directorio del SAP NW RFC SDK intentando: variable del .env,
+    variable de entorno, y rutas habituales en el servidor.
+    """
+    from_env = config('SAPNWRFC_HOME', default='') or os.environ.get('SAPNWRFC_HOME', '')
+    if from_env:
+        return from_env
+    for path in (
+        '/home/ac42027/nwrfcsdk',
+        '/usr/local/sap/nwrfcsdk',
+        '/opt/sap/nwrfcsdk',
+    ):
+        if os.path.isfile(os.path.join(path, 'lib', 'libsapnwrfc.so')):
+            return path
+    return '/usr/local/sap/nwrfcsdk'
+
+
 def _precargar_sdk():
     """
     Carga las librerías compartidas del SDK SAP NW RFC con RTLD_GLOBAL
     ANTES de importar pyrfc. Evita depender de LD_LIBRARY_PATH heredado.
     """
-    sdk_home = config('SAPNWRFC_HOME', default='/home/ac42027/nwrfcsdk')
+    sdk_home = _sdk_home()
     lib_dir = os.path.join(sdk_home, 'lib')
     if not os.path.isdir(lib_dir):
         raise SapRfcError(

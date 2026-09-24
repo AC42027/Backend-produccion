@@ -116,6 +116,24 @@ jobs:
           echo "--- journal tras smoke (ultimos) ---"
           sudo journalctl -u inspecciones -n 25 --no-pager 2>&1 | tail -25 || true
           echo "=== prueba pyrfc: usuario ac17157 + formatos OPTIONS ==="
+          echo "--- import pyrfc SIMULANDO el servicio (sin LD_LIBRARY_PATH) ---"
+          env -u LD_LIBRARY_PATH -u SAPNWRFC_HOME ./venv/bin/python - <<'PY' 2>&1
+          import os, ctypes, inspect
+          print("cwd ->", os.getcwd())
+          try:
+              import inspeccion.sap_pyrfc as m
+              print("sap_pyrfc OK; _pyrfc =", m._pyrfc)
+              if m._pyrfc is not None:
+                  print("pyrfc file ->", getattr(m._pyrfc, '__file__', '?'))
+                  print("has Connection ->", hasattr(m._pyrfc, 'Connection'))
+                  try:
+                      c = m._pyrfc.Connection
+                      print("Connection ->", c)
+                  except Exception as e:
+                      print("Connection attr error:", e)
+          except Exception as e:
+              import traceback; traceback.print_exc()
+          PY
           ./venv/bin/python - <<'PY' 2>&1
           import os, sys
           os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mi_formulario.settings')

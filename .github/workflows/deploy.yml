@@ -73,6 +73,29 @@ jobs:
           cd /var/www/html/insp_pry/Backend-produccion
           ./venv/bin/python manage.py collectstatic --noinput
 
+      - name: Configurar env SDK SAP para el servicio
+        run: |
+          if [ -d /home/ac42027/nwrfcsdk/lib ]; then
+            SDK=/home/ac42027/nwrfcsdk
+          elif [ -d /usr/local/sap/nwrfcsdk/lib ]; then
+            SDK=/usr/local/sap/nwrfcsdk
+          else
+            echo "ERROR: no se encontró el SDK SAP NW RFC (lib)"; exit 1
+          fi
+          CONF_DIR=/etc/systemd/system/inspecciones.service.d
+          sudo mkdir -p "$CONF_DIR"
+          cat > /tmp/inspecciones-sdk.conf <<EOF
+          # Generado por deploy workflow - SDK SAP NW RFC para pyrfc
+          [Service]
+          Environment=LD_LIBRARY_PATH=$SDK/lib
+          Environment=SAPNWRFC_HOME=$SDK
+          EOF
+          sudo cp /tmp/inspecciones-sdk.conf "$CONF_DIR/10-sap-sdk.conf"
+          sudo chmod 644 "$CONF_DIR/10-sap-sdk.conf"
+          sudo systemctl daemon-reload
+          echo "OK: SDK=$SDK drop-in instalado"
+          sudo systemctl show inspecciones -p ExecStart -p Environment 2>&1 | sed 's/LD_LIBRARY_PATH=.*/LD_LIBRARY_PATH=<oculto>/' || true
+
       - name: Restart Backend Service
         run: |
           sudo systemctl restart inspecciones.service

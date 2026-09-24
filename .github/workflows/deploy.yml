@@ -91,15 +91,20 @@ jobs:
             echo "Backup uvicorn -> uvicorn.bin"
           fi
           if [ -L "$BIN/uvicorn" ]; then rm "$BIN/uvicorn"; fi
+          ABSDIR=$(cd "$(dirname "$BIN/uvicorn")" && pwd)
+          if [ -x "$ABSDIR/python3.11" ]; then PY="$ABSDIR/python3.11";
+          elif [ -x "$ABSDIR/python3" ]; then PY="$ABSDIR/python3";
+          elif [ -x "$ABSDIR/python" ]; then PY="$ABSDIR/python";
+          else echo "ERROR: no hay intérprete python en $ABSDIR"; exit 1; fi
           cat > "$BIN/uvicorn" <<EOW
           #!/bin/bash
           # Wrapper generado por deploy workflow - inyecta el SDK SAP NW RFC
           export SAPNWRFC_HOME="$SDK"
           export LD_LIBRARY_PATH="$SDK/lib:\${LD_LIBRARY_PATH:-}"
-          exec "\$BIN/python3.11" -m uvicorn "\$@"
+          exec "$PY" -m uvicorn "\$@"
           EOW
           chmod +x "$BIN/uvicorn"
-          echo "OK: wrapper uvicorn generado con SDK=$SDK"
+          echo "OK: wrapper uvicorn generado con SDK=$SDK PY=$PY"
           "$BIN/uvicorn" --version 2>&1 | head -2
           ls -la "$BIN/uvicorn" "$BIN/uvicorn.bin"
 

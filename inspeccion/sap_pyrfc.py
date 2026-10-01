@@ -10,8 +10,8 @@ Lógica de consulta:
     1. QMEL  -> OBJNR del aviso (QMNUM, 12 dígitos).
     2. JEST  -> STAT activos para ese OBJNR (INACT = '').
 
-Estado: si JEST contiene 'MEAB' el aviso está cerrado; en caso contrario,
-se reporta abierto. Auth: user/pass LDAP del request.
+Estado: si JEST contiene un estado de cierre ('MEAB' o 'MECE'), el aviso está
+cerrado; en caso contrario, se reporta abierto. Auth: user/pass LDAP del request.
 """
 
 import os
@@ -34,10 +34,15 @@ _cache_avisos = {}          # aviso -> (timestamp, entry)
 _cache_ttl = config('SAP_AVISO_CACHE_TTL', default=600, cast=int)
 
 AVISO_TARGETS_SOPORTADOS = ['L1P']
+ESTADOS_AVISO_CERRADO = frozenset({'MEAB', 'MECE'})
 
 
 class SapRfcError(Exception):
     pass
+
+
+def _aviso_esta_cerrado(estados):
+    return bool(ESTADOS_AVISO_CERRADO.intersection(estados or set()))
 
 
 def _sdk_home():
@@ -189,7 +194,7 @@ def consultar_status_avisos_directo(numeros, username, password, target='L1P'):
     pocas llamadas RFC (en vez de 2 llamadas por aviso).
 
     Devuelve dict {aviso: {'status','order','description','equipment'}}.
-      - status: 'Cerrado' (MEAB en JEST) | 'Abierto' | '' si no se encuentra.
+      - status: 'Cerrado' (MEAB/MECE en JEST) | 'Abierto' | '' si no se encuentra.
       - order: número de orden asociada (QMEL.AUFNR).
       - description: texto corto del aviso (QMEL.QMTXT).
     """
@@ -277,12 +282,13 @@ def consultar_status_avisos_directo(numeros, username, password, target='L1P'):
                     }
                     continue
                 stats = stats_por_objnr.get(dato['objnr'], set())
-                status = 'Cerrado' if 'MEAB' in stats else 'Abierto'
+                status = 'Cerrado' if _aviso_esta_cerrado(stats) else 'Abierto'
                 resultado[aviso] = {
                     'status': status,
                     'order': dato['order'],
                     'description': dato['description'],
                     'equipment': '',
+                    'statuses': sorted(stats),
                 }
 
             # Llenar caché con los recién consultados

@@ -10,8 +10,9 @@ Lógica de consulta:
     1. QMEL  -> OBJNR del aviso (QMNUM, 12 dígitos).
     2. JEST  -> STAT activos para ese OBJNR (INACT = '').
 
-Estado: si JEST contiene un estado de cierre ('MEAB' o 'MECE'), el aviso está
-cerrado; en caso contrario, se reporta abierto. Auth: user/pass LDAP del request.
+Estado: si JEST contiene el estado técnico de notificación completada
+('I0072'), el aviso está cerrado; en caso contrario, se reporta abierto.
+Auth: user/pass LDAP del request.
 """
 
 import os
@@ -34,7 +35,9 @@ _cache_avisos = {}          # aviso -> (timestamp, entry)
 _cache_ttl = config('SAP_AVISO_CACHE_TTL', default=600, cast=int)
 
 AVISO_TARGETS_SOPORTADOS = ['L1P']
-ESTADOS_AVISO_CERRADO = frozenset({'MEAB', 'MECE'})
+# JEST-STAT guarda códigos internos, no las abreviaturas visibles en SAP.
+# I0072 corresponde al estado de sistema "Notification completed" (NOCO/MECE).
+ESTADOS_AVISO_CERRADO = frozenset({'I0072'})
 
 
 class SapRfcError(Exception):
@@ -194,7 +197,7 @@ def consultar_status_avisos_directo(numeros, username, password, target='L1P'):
     pocas llamadas RFC (en vez de 2 llamadas por aviso).
 
     Devuelve dict {aviso: {'status','order','description','equipment'}}.
-      - status: 'Cerrado' (MEAB/MECE en JEST) | 'Abierto' | '' si no se encuentra.
+      - status: 'Cerrado' (I0072 en JEST) | 'Abierto' | '' si no se encuentra.
       - order: número de orden asociada (QMEL.AUFNR).
       - description: texto corto del aviso (QMEL.QMTXT).
     """
